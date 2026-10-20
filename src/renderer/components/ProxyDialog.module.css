@@ -1,0 +1,761 @@
+/* Network proxy dialog. Shared buttons, alerts, and spinners live in ui.module.css. */
+
+.proxy-dialog {
+  width: min(600px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  padding: 0;
+  margin: auto;
+  overflow: hidden;
+  color: var(--ink);
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid rgb(23 25 31 / 12%);
+  border-radius: 22px;
+  box-shadow:
+    0 32px 90px -24px rgb(23 25 31 / 48%),
+    0 8px 26px -18px rgb(23 25 31 / 35%);
+}
+
+.proxy-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: dialog-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.proxy-dialog::backdrop {
+  background: rgb(18 20 25 / 46%);
+  backdrop-filter: blur(7px);
+  animation: backdrop-enter 0.18s ease-out;
+}
+
+.proxy-dialog-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
+  min-height: 0;
+}
+
+.proxy-dialog-header {
+  display: flex;
+  flex: none;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.proxy-dialog-icon {
+  display: grid;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  color: var(--surface);
+  background: var(--ink);
+  border-radius: 13px;
+  box-shadow: 0 8px 20px rgb(23 25 31 / 14%);
+  place-items: center;
+}
+
+.proxy-dialog-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.proxy-dialog-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.proxy-dialog-kicker {
+  margin: 0 0 3px;
+  color: var(--blue);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.proxy-dialog-heading h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.proxy-dialog-heading p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.proxy-dialog-close {
+  display: grid;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin-left: auto;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.proxy-dialog-close svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.1;
+}
+
+.proxy-dialog-close:hover {
+  color: var(--ink);
+  background: rgb(23 25 31 / 6%);
+}
+
+.proxy-dialog-close:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.proxy-dialog-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.proxy-dialog-state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.proxy-dialog-state p {
+  margin: 0;
+}
+
+.proxy-dialog-state--error {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 0;
+}
+
+.proxy-dialog-state--error strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.proxy-dialog-state--error p {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.proxy-dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 20px 24px 16px;
+  overflow-y: auto;
+  scrollbar-color: rgb(23 25 31 / 18%) transparent;
+  scrollbar-width: thin;
+}
+
+.proxy-dialog-body--saved {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 26px;
+  padding-bottom: 24px;
+}
+
+.proxy-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.proxy-toggle {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 16px;
+  margin-bottom: 20px;
+  background: rgb(244 241 232 / 52%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.proxy-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.proxy-toggle-copy strong {
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+}
+
+.proxy-toggle-copy > span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.proxy-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+}
+
+.proxy-switch-track {
+  position: absolute;
+  inset: 0;
+  background: rgb(23 25 31 / 18%);
+  border-radius: 999px;
+  transition: background-color 0.16s ease;
+}
+
+.proxy-switch-track::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(23 25 31 / 24%);
+  content: '';
+  transition: transform 0.16s ease;
+}
+
+.proxy-switch input:checked + .proxy-switch-track {
+  background: var(--blue);
+}
+
+.proxy-switch input:checked + .proxy-switch-track::after {
+  transform: translateX(16px);
+}
+
+.proxy-switch input:focus-visible + .proxy-switch-track {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.proxy-switch input:disabled + .proxy-switch-track {
+  opacity: 0.55;
+}
+
+.proxy-fields {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 96px;
+  gap: 12px;
+}
+
+.proxy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.proxy-field-label {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.proxy-field input,
+.proxy-field select {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.proxy-field input::placeholder {
+  color: rgb(107 110 119 / 58%);
+}
+
+.proxy-field input:focus,
+.proxy-field select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgb(33 72 255 / 10%);
+}
+
+.proxy-field input:disabled,
+.proxy-field select:disabled {
+  color: var(--muted);
+  background: rgb(244 241 232 / 56%);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.proxy-fields-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.6;
+}
+
+.proxy-test {
+  padding-top: 18px;
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.proxy-test-header {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.proxy-test-header h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: -0.02em;
+}
+
+.proxy-test-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.proxy-test-button {
+  display: inline-flex;
+  flex: none;
+  gap: 7px;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 650;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.proxy-test-button:hover {
+  background: var(--paper);
+}
+
+.proxy-test-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.proxy-test-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.proxy-test-results {
+  margin-top: 12px;
+  overflow: hidden;
+  background: rgb(244 241 232 / 32%);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.proxy-test-result {
+  display: grid;
+  grid-template-columns: 20px minmax(64px, auto) minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 11px;
+  border-top: 1px solid var(--line);
+}
+
+.proxy-test-result:first-child {
+  border-top: 0;
+}
+
+.proxy-test-status {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  border-radius: 50%;
+  place-items: center;
+}
+
+.proxy-test-result.is-success .proxy-test-status {
+  color: var(--success);
+  background: rgb(31 138 77 / 11%);
+}
+
+.proxy-test-result.is-failure .proxy-test-status {
+  color: var(--danger);
+  background: rgb(215 68 73 / 10%);
+}
+
+.proxy-test-name {
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.proxy-test-message {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proxy-test-latency {
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.6rem;
+}
+
+.proxy-test-summary {
+  padding: 9px 11px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.5;
+  background: rgb(255 253 248 / 52%);
+  border-top: 1px solid var(--line);
+}
+
+.proxy-test-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.5;
+}
+
+.proxy-success-icon {
+  display: grid;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 800;
+  background: var(--lime);
+  border-radius: 15px;
+  box-shadow: 0 8px 22px rgb(206 243 107 / 26%);
+  place-items: center;
+}
+
+.proxy-success-icon.is-off {
+  color: var(--muted);
+  background: rgb(23 25 31 / 7%);
+  box-shadow: none;
+}
+
+.proxy-saved-hero {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.proxy-saved-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.proxy-saved-kicker-row {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.proxy-saved-kicker-row .proxy-dialog-kicker {
+  margin: 0;
+}
+
+.proxy-state-pill {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 650;
+  line-height: 1.2;
+  background: rgb(23 25 31 / 6%);
+  border-radius: 999px;
+}
+
+.proxy-state-pill.is-on {
+  color: var(--success);
+  background: rgb(31 138 77 / 9%);
+}
+
+.proxy-state-dot {
+  width: 5px;
+  height: 5px;
+  background: rgb(23 25 31 / 25%);
+  border-radius: 50%;
+}
+
+.proxy-state-pill.is-on .proxy-state-dot {
+  background: var(--success);
+}
+
+.proxy-dialog-body--saved .proxy-dialog-kicker {
+  color: var(--success);
+}
+
+.proxy-dialog-body--saved h3 {
+  margin: 0 0 8px;
+  font-size: 1.32rem;
+  letter-spacing: -0.035em;
+}
+
+.proxy-dialog-body--saved h3:focus {
+  outline: none;
+}
+
+.proxy-success-copy {
+  max-width: 430px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.proxy-summary {
+  width: 100%;
+  margin: 20px 0 0;
+}
+
+.proxy-summary > div {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.proxy-summary > div:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.proxy-summary dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.proxy-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+.proxy-dialog-footer {
+  display: flex;
+  flex: none;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: rgb(244 241 232 / 45%);
+  border-top: 1px solid var(--line);
+}
+
+.proxy-footer-hint {
+  max-width: 280px;
+  color: var(--muted);
+  font-size: 0.63rem;
+  line-height: 1.5;
+}
+
+.proxy-footer-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .proxy-dialog {
+    border-color: var(--line);
+    box-shadow:
+      0 32px 90px -24px rgb(0 0 0 / 72%),
+      0 8px 26px -18px rgb(0 0 0 / 55%);
+  }
+
+  .proxy-dialog::backdrop {
+    background: rgb(4 6 10 / 66%);
+  }
+
+  .proxy-dialog-close:hover {
+    background: rgb(255 255 255 / 6%);
+  }
+
+  .proxy-toggle {
+    background: rgb(255 255 255 / 3.5%);
+  }
+
+  .proxy-switch-track {
+    background: rgb(255 255 255 / 18%);
+  }
+
+  .proxy-switch-track::after {
+    background: #f1ede4;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+  }
+
+  .proxy-field input,
+  .proxy-field select {
+    background: #14171d;
+  }
+
+  .proxy-field input::placeholder {
+    color: rgb(190 193 203 / 48%);
+  }
+
+  .proxy-field input:disabled,
+  .proxy-field select:disabled {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .proxy-test-results {
+    background: rgb(255 255 255 / 3%);
+  }
+
+  .proxy-test-summary {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .proxy-success-icon {
+    color: #17191f;
+  }
+
+  .proxy-success-icon.is-off {
+    color: var(--muted);
+    background: rgb(255 255 255 / 7%);
+  }
+
+  .proxy-state-pill {
+    background: rgb(255 255 255 / 6%);
+  }
+
+  .proxy-state-dot {
+    background: rgb(255 255 255 / 25%);
+  }
+
+  .proxy-dialog-footer {
+    background: rgb(255 255 255 / 3%);
+  }
+
+  .proxy-dialog-body {
+    scrollbar-color: rgb(255 255 255 / 18%) transparent;
+  }
+}
+
+@media (max-width: 680px) {
+  .proxy-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    border-radius: 18px;
+  }
+
+  .proxy-dialog-shell {
+    max-height: calc(100vh - 24px);
+  }
+
+  .proxy-dialog-header {
+    padding: 18px;
+  }
+
+  .proxy-dialog-body {
+    padding: 16px 18px 14px;
+  }
+
+  .proxy-dialog-body--saved {
+    padding-top: 22px;
+    padding-bottom: 20px;
+  }
+
+  .proxy-fields {
+    grid-template-columns: 96px minmax(0, 1fr) 84px;
+    gap: 8px;
+  }
+
+  .proxy-test-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .proxy-test-button {
+    align-self: flex-start;
+  }
+
+  .proxy-dialog-footer {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+    padding: 12px 18px;
+  }
+
+  .proxy-footer-hint {
+    max-width: none;
+  }
+
+  .proxy-footer-actions {
+    justify-content: flex-end;
+  }
+}

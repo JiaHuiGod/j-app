@@ -12,7 +12,17 @@ import {
   type ProxyTestResult,
 } from '@shared/settings';
 import { toErrorMessage } from '../lib/errors';
+import ui from '../styles/ui.module.css';
 import { GlobeIcon } from './GlobeIcon';
+import styles from './ProxyDialog.module.css';
+
+function localStyles(...names: Array<string | false | undefined>): string {
+  return names
+    .filter((name): name is string => Boolean(name))
+    .flatMap((name) => name.split(/\s+/))
+    .map((name) => styles[name] ?? name)
+    .join(' ');
+}
 
 const PROTOCOL_LABELS: Record<ProxyProtocol, string> = {
   http: 'HTTP',
@@ -231,18 +241,18 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
     <dialog
       aria-describedby="proxy-dialog-description"
       aria-labelledby="proxy-dialog-title"
-      className="proxy-dialog"
+      className={localStyles('proxy-dialog')}
       ref={dialogRef}
       onCancel={handleCancel}
     >
-      <div className="proxy-dialog-shell">
-        <header className="proxy-dialog-header">
-          <span className="proxy-dialog-icon" aria-hidden="true">
+      <div className={localStyles('proxy-dialog-shell')}>
+        <header className={localStyles('proxy-dialog-header')}>
+          <span className={localStyles('proxy-dialog-icon')} aria-hidden="true">
             <GlobeIcon />
           </span>
 
-          <div className="proxy-dialog-heading">
-            <p className="proxy-dialog-kicker">Network</p>
+          <div className={localStyles('proxy-dialog-heading')}>
+            <p className={localStyles('proxy-dialog-kicker')}>Network</p>
             <h2 id="proxy-dialog-title">网络代理</h2>
             <p id="proxy-dialog-description">
               为此应用配置独立的网络出口，重启后生效。
@@ -251,7 +261,7 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
 
           <button
             aria-label="关闭网络代理设置"
-            className="proxy-dialog-close"
+            className={localStyles('proxy-dialog-close')}
             disabled={isBusy}
             title="关闭"
             type="button"
@@ -264,18 +274,23 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
         </header>
 
         {isLoading && (
-          <output className="proxy-dialog-state">
-            <span className="proxy-spinner" aria-hidden="true" />
+          <output className={localStyles('proxy-dialog-state')}>
+            <span className={ui.spinner} aria-hidden="true" />
             <p>正在读取代理配置…</p>
           </output>
         )}
 
         {!isLoading && loadError && (
-          <div className="proxy-dialog-state proxy-dialog-state--error">
+          <div
+            className={localStyles(
+              'proxy-dialog-state',
+              'proxy-dialog-state--error',
+            )}
+          >
             <strong>读取代理配置失败</strong>
             <p>{loadError}</p>
             <button
-              className="proxy-button proxy-button--secondary"
+              className={`${ui.button} ${ui.buttonSecondary}`}
               type="button"
               onClick={onClose}
             >
@@ -286,29 +301,43 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
 
         {!isLoading && !loadError && stage === 'saved' && (
           <>
-            <div className="proxy-dialog-body proxy-dialog-body--saved">
-              <div className="proxy-saved-hero">
+            <div
+              className={localStyles(
+                'proxy-dialog-body',
+                'proxy-dialog-body--saved',
+              )}
+            >
+              <div className={localStyles('proxy-saved-hero')}>
                 <span
-                  className={`proxy-success-icon${draft.enabled ? '' : ' is-off'}`}
+                  className={localStyles(
+                    'proxy-success-icon',
+                    !draft.enabled && 'is-off',
+                  )}
                   aria-hidden="true"
                 >
                   ✓
                 </span>
 
-                <div className="proxy-saved-heading">
-                  <div className="proxy-saved-kicker-row">
-                    <p className="proxy-dialog-kicker">Saved</p>
+                <div className={localStyles('proxy-saved-heading')}>
+                  <div className={localStyles('proxy-saved-kicker-row')}>
+                    <p className={localStyles('proxy-dialog-kicker')}>Saved</p>
                     <span
-                      className={`proxy-state-pill${draft.enabled ? ' is-on' : ''}`}
+                      className={localStyles(
+                        'proxy-state-pill',
+                        draft.enabled && 'is-on',
+                      )}
                     >
-                      <span className="proxy-state-dot" aria-hidden="true" />
+                      <span
+                        className={localStyles('proxy-state-dot')}
+                        aria-hidden="true"
+                      />
                       {draft.enabled ? '已开启' : '未开启'}
                     </span>
                   </div>
                   <h3 ref={savedHeadingRef} tabIndex={-1}>
                     {draft.enabled ? '自定义代理已开启' : '自定义代理已关闭'}
                   </h3>
-                  <p className="proxy-success-copy">
+                  <p className={localStyles('proxy-success-copy')}>
                     {draft.enabled
                       ? '重启应用后，网络请求将通过此代理发送。你可以现在重启，也可以稍后手动重启。'
                       : '重启应用后将恢复使用系统代理设置。你可以现在重启，也可以稍后手动重启。'}
@@ -316,7 +345,7 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                 </div>
               </div>
 
-              <dl className="proxy-summary">
+              <dl className={localStyles('proxy-summary')}>
                 <div>
                   <dt>下次启动</dt>
                   <dd>{draft.enabled ? '使用自定义代理' : '跟随系统代理'}</dd>
@@ -332,13 +361,13 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
               </dl>
             </div>
 
-            <footer className="proxy-dialog-footer">
-              <span className="proxy-footer-hint">
+            <footer className={localStyles('proxy-dialog-footer')}>
+              <span className={localStyles('proxy-footer-hint')}>
                 选择稍后时，请手动退出并重新启动应用。
               </span>
-              <div className="proxy-footer-actions">
+              <div className={localStyles('proxy-footer-actions')}>
                 <button
-                  className="proxy-button proxy-button--secondary"
+                  className={`${ui.button} ${ui.buttonSecondary}`}
                   disabled={isRestarting}
                   type="button"
                   onClick={requestClose}
@@ -346,7 +375,7 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                   稍后手动重启
                 </button>
                 <button
-                  className="proxy-button proxy-button--primary"
+                  className={`${ui.button} ${ui.buttonPrimary}`}
                   disabled={isRestarting}
                   type="button"
                   onClick={handleRestart}
@@ -361,23 +390,23 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
         {!isLoading && !loadError && stage === 'form' && (
           <form
             autoComplete="off"
-            className="proxy-form"
+            className={localStyles('proxy-form')}
             noValidate
             onSubmit={handleSave}
           >
-            <div className="proxy-dialog-body">
+            <div className={localStyles('proxy-dialog-body')}>
               {error && (
-                <div className="proxy-alert" role="alert">
+                <div className={ui.alert} role="alert">
                   {error}
                 </div>
               )}
 
-              <label className="proxy-toggle">
-                <span className="proxy-toggle-copy">
+              <label className={localStyles('proxy-toggle')}>
+                <span className={localStyles('proxy-toggle-copy')}>
                   <strong>使用自定义代理</strong>
                   <span>关闭时沿用系统代理设置</span>
                 </span>
-                <span className="proxy-switch">
+                <span className={localStyles('proxy-switch')}>
                   <input
                     aria-label="使用自定义代理"
                     checked={draft.enabled}
@@ -388,13 +417,18 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                       updateDraft({ enabled: event.target.checked });
                     }}
                   />
-                  <span className="proxy-switch-track" aria-hidden="true" />
+                  <span
+                    className={localStyles('proxy-switch-track')}
+                    aria-hidden="true"
+                  />
                 </span>
               </label>
 
-              <div className="proxy-fields">
-                <label className="proxy-field">
-                  <span className="proxy-field-label">代理协议</span>
+              <div className={localStyles('proxy-fields')}>
+                <label className={localStyles('proxy-field')}>
+                  <span className={localStyles('proxy-field-label')}>
+                    代理协议
+                  </span>
                   <select
                     disabled={isFormDisabled}
                     value={draft.protocol}
@@ -412,8 +446,8 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                   </select>
                 </label>
 
-                <label className="proxy-field proxy-field--host">
-                  <span className="proxy-field-label">主机</span>
+                <label className={localStyles('proxy-field')}>
+                  <span className={localStyles('proxy-field-label')}>主机</span>
                   <input
                     disabled={isFormDisabled}
                     placeholder="127.0.0.1"
@@ -426,8 +460,8 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                   />
                 </label>
 
-                <label className="proxy-field proxy-field--port">
-                  <span className="proxy-field-label">端口</span>
+                <label className={localStyles('proxy-field')}>
+                  <span className={localStyles('proxy-field-label')}>端口</span>
                   <input
                     disabled={isFormDisabled}
                     inputMode="numeric"
@@ -443,21 +477,21 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                 </label>
               </div>
 
-              <p className="proxy-fields-hint">
+              <p className={localStyles('proxy-fields-hint')}>
                 仅支持无需认证的代理；localhost、127.0.0.1 和 ::1 会自动直连。
               </p>
 
               <section
                 aria-labelledby="proxy-test-title"
-                className="proxy-test"
+                className={localStyles('proxy-test')}
               >
-                <div className="proxy-test-header">
+                <div className={localStyles('proxy-test-header')}>
                   <div>
                     <h3 id="proxy-test-title">连接测试</h3>
                     <p>通过此代理访问 Google 与 GitHub。</p>
                   </div>
                   <button
-                    className="proxy-test-button"
+                    className={localStyles('proxy-test-button')}
                     disabled={!draft.enabled || isBusy}
                     type="button"
                     onClick={handleTest}
@@ -465,7 +499,7 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                     {isTesting ? (
                       <>
                         <span
-                          className="proxy-spinner proxy-spinner--small"
+                          className={`${ui.spinner} ${ui.spinnerSmall}`}
                           aria-hidden="true"
                         />
                         测试中…
@@ -477,34 +511,45 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                 </div>
 
                 {testResult ? (
-                  <div className="proxy-test-results" aria-live="polite">
+                  <div
+                    className={localStyles('proxy-test-results')}
+                    aria-live="polite"
+                  >
                     {testResult.results.map((result) => (
                       <div
-                        className={`proxy-test-result${result.ok ? ' is-success' : ' is-failure'}`}
+                        className={localStyles(
+                          'proxy-test-result',
+                          result.ok ? 'is-success' : 'is-failure',
+                        )}
                         key={result.id}
                       >
-                        <span className="proxy-test-status" aria-hidden="true">
+                        <span
+                          className={localStyles('proxy-test-status')}
+                          aria-hidden="true"
+                        >
                           {result.ok ? '✓' : '×'}
                         </span>
-                        <span className="proxy-test-name">{result.label}</span>
-                        <span className="proxy-test-message">
+                        <span className={localStyles('proxy-test-name')}>
+                          {result.label}
+                        </span>
+                        <span className={localStyles('proxy-test-message')}>
                           {result.message}
                         </span>
-                        <span className="proxy-test-latency">
+                        <span className={localStyles('proxy-test-latency')}>
                           {result.ok && result.latencyMs !== null
                             ? `${result.latencyMs} ms`
                             : '—'}
                         </span>
                       </div>
                     ))}
-                    <p className="proxy-test-summary">
+                    <p className={localStyles('proxy-test-summary')}>
                       {testResult.ok
                         ? '两个目标均可访问，代理链路正常。'
                         : '至少一个目标不可达，建议检查代理配置。'}
                     </p>
                   </div>
                 ) : (
-                  <p className="proxy-test-hint">
+                  <p className={localStyles('proxy-test-hint')}>
                     {draft.enabled
                       ? '保存前可以先确认代理链路是否可用。'
                       : '启用自定义代理后即可测试。'}
@@ -513,13 +558,13 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
               </section>
             </div>
 
-            <footer className="proxy-dialog-footer">
-              <span className="proxy-footer-hint">
+            <footer className={localStyles('proxy-dialog-footer')}>
+              <span className={localStyles('proxy-footer-hint')}>
                 保存后需要重启应用才能生效。
               </span>
-              <div className="proxy-footer-actions">
+              <div className={localStyles('proxy-footer-actions')}>
                 <button
-                  className="proxy-button proxy-button--secondary"
+                  className={`${ui.button} ${ui.buttonSecondary}`}
                   disabled={isBusy}
                   type="button"
                   onClick={requestClose}
@@ -527,7 +572,7 @@ export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {
                   取消
                 </button>
                 <button
-                  className="proxy-button proxy-button--primary"
+                  className={`${ui.button} ${ui.buttonPrimary}`}
                   disabled={isBusy}
                   type="submit"
                 >

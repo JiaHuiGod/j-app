@@ -1,0 +1,117 @@
+.button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.buttonPrimary {
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: #2a2d35;
+}
+
+.buttonSecondary {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+.buttonDanger {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background: #bf383e;
+}
+
+.spinner {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgb(23 25 31 / 14%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinnerSmall {
+  width: 11px;
+  height: 11px;
+  border-width: 1.5px;
+}
+
+.alert {
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  color: #992d32;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  background: #fff0f0;
+  border: 1px solid #f1c9cb;
+  border-radius: 9px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .buttonPrimary {
+    color: #15171c;
+    background: #f1ede4;
+  }
+
+  .buttonPrimary:hover:not(:disabled) {
+    background: #ddd7ca;
+  }
+
+  .buttonDanger {
+    color: #fff;
+    background: #c8464b;
+    border-color: #c8464b;
+  }
+
+  .buttonDanger:hover:not(:disabled) {
+    background: #b83a3f;
+  }
+
+  .spinner {
+    border-color: rgb(255 255 255 / 15%);
+    border-top-color: currentColor;
+  }
+
+  .alert {
+    color: #ffb1b4;
+    background: rgb(255 108 113 / 9%);
+    border-color: rgb(255 123 128 / 24%);
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { type ThemePreference } from '@shared/appearance';
 import { toErrorMessage } from '../lib/errors';
+import styles from './ThemeSettings.module.css';
 
 interface ThemeOption {
   readonly value: ThemePreference;
@@ -26,19 +27,28 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
   },
 ];
 
+const THEME_PREVIEW_CLASSES: Record<ThemePreference, string> = {
+  light: styles.previewLight ?? '',
+  dark: styles.previewDark ?? '',
+  system: styles.previewSystem ?? '',
+};
+
 function ThemePreview({ mode }: { mode: ThemePreference }) {
   return (
-    <span aria-hidden="true" className={`theme-preview theme-preview--${mode}`}>
-      <span className="theme-preview-window">
-        <span className="theme-preview-bar">
+    <span
+      aria-hidden="true"
+      className={`${styles.preview} ${THEME_PREVIEW_CLASSES[mode]}`}
+    >
+      <span className={styles.previewWindow}>
+        <span className={styles.previewBar}>
           <span />
           <span />
           <span />
         </span>
-        <span className="theme-preview-content">
-          <span className="theme-preview-title" />
-          <span className="theme-preview-line" />
-          <span className="theme-preview-line theme-preview-line--short" />
+        <span className={styles.previewContent}>
+          <span className={styles.previewTitle} />
+          <span className={styles.previewLine} />
+          <span className={`${styles.previewLine} ${styles.previewShort}`} />
         </span>
       </span>
     </span>
@@ -106,35 +116,35 @@ export function ThemeSettings() {
   };
 
   return (
-    <section aria-labelledby="appearance-title" className="appearance-card">
-      <header className="appearance-header">
+    <section aria-labelledby="appearance-title" className={styles.card}>
+      <header className={styles.header}>
         <div>
-          <p className="settings-kicker">Appearance</p>
+          <p className={styles.kicker}>Appearance</p>
           <h2 id="appearance-title">外观</h2>
           <p>选择应用主题，更改会立即生效并保存在本机。</p>
         </div>
         <span
           aria-live="polite"
-          className={`appearance-status${isSaving ? ' is-saving' : ''}`}
+          className={`${styles.status}${isSaving ? ` ${styles.saving}` : ''}`}
         >
           {isLoading ? '读取中…' : isSaving ? '正在应用…' : '即时生效'}
         </span>
       </header>
 
-      <fieldset className="theme-fieldset" disabled={isLoading || isSaving}>
+      <fieldset className={styles.fieldset} disabled={isLoading || isSaving}>
         <legend className="sr-only">主题模式</legend>
-        <div className="theme-options">
+        <div className={styles.options}>
           {THEME_OPTIONS.map((option) => {
             const isSelected = preference === option.value;
 
             return (
               <label
-                className={`theme-option${isSelected ? ' is-selected' : ''}`}
+                className={`${styles.option}${isSelected ? ` ${styles.selected}` : ''}`}
                 key={option.value}
               >
                 <input
                   checked={isSelected}
-                  className="theme-option-input"
+                  className={styles.input}
                   name="theme"
                   type="radio"
                   value={option.value}
@@ -143,11 +153,11 @@ export function ThemeSettings() {
                   }}
                 />
                 <ThemePreview mode={option.value} />
-                <span className="theme-option-copy">
+                <span className={styles.copy}>
                   <strong>{option.label}</strong>
                   <small>{option.description}</small>
                 </span>
-                <span className="theme-option-check" aria-hidden="true">
+                <span className={styles.check} aria-hidden="true">
                   <svg focusable="false" viewBox="0 0 12 12">
                     <path d="m2.5 6.2 2.2 2.2 4.8-5.1" />
                   </svg>
@@ -159,7 +169,7 @@ export function ThemeSettings() {
       </fieldset>
 
       {error && (
-        <div className="appearance-error" role="alert">
+        <div className={styles.error} role="alert">
           {error}
         </div>
       )}

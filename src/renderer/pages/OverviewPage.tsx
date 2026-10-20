@@ -1,4 +1,6 @@
 import { useAppInfo } from '../hooks/useAppInfo';
+import page from '../styles/page.module.css';
+import styles from './OverviewPage.module.css';
 
 const architectureLayers = [
   {
@@ -32,34 +34,34 @@ export function OverviewPage() {
   const { state, retry } = useAppInfo();
 
   return (
-    <main className="content">
-      <section className="intro" aria-labelledby="intro-title">
-        <p className="eyebrow">Electron / React / TypeScript</p>
+    <main className={page.content}>
+      <section className={page.intro} aria-labelledby="intro-title">
+        <p className={page.eyebrow}>Electron / React / TypeScript</p>
         <h1 id="intro-title">
           从清晰的边界开始，
           <br />
-          构建<span className="highlight">可靠的</span>桌面应用。
+          构建<span className={page.highlight}>可靠的</span>桌面应用。
         </h1>
-        <p className="lede">
+        <p className={page.lede}>
           主进程掌握系统权限，预加载层收窄通信边界，渲染进程专注界面。
           这是一个已经搭好安全骨架、可以直接开始写业务的起点。
         </p>
 
-        <div className="stack" aria-label="技术栈">
+        <div className={page.stack} aria-label="技术栈">
           <span>Electron 44</span>
           <span>React 19</span>
           <span>TypeScript</span>
           <span>Vite 8</span>
         </div>
 
-        <ol className="layers" aria-label="进程架构">
+        <ol className={styles.layers} aria-label="进程架构">
           {architectureLayers.map((layer, index) => (
-            <li className="layer" key={layer.name}>
-              <div className="layer-heading">
-                <span className="layer-index">
+            <li className={styles.layer} key={layer.name}>
+              <div className={styles.layerHeading}>
+                <span className={styles.layerIndex}>
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <span className="layer-name">{layer.name}</span>
+                <span className={styles.layerName}>{layer.name}</span>
               </div>
               <code>{layer.path}</code>
               <p>{layer.description}</p>
@@ -68,25 +70,27 @@ export function OverviewPage() {
         </ol>
       </section>
 
-      <aside className="runtime-card" aria-labelledby="runtime-title">
-        <div className="runtime-top">
-          <span className="runtime-kicker">Runtime</span>
-          <span className="runtime-live">
+      <aside className={styles.runtimeCard} aria-labelledby="runtime-title">
+        <div className={styles.runtimeTop}>
+          <span className={styles.runtimeKicker}>Runtime</span>
+          <span className={styles.runtimeLive}>
             <span aria-hidden="true" />
             Live
           </span>
         </div>
 
         <h2 id="runtime-title">运行环境</h2>
-        <p className="runtime-subtitle">由主进程通过类型安全的 IPC 返回</p>
+        <p className={styles.runtimeSubtitle}>
+          由主进程通过类型安全的 IPC 返回
+        </p>
 
         {state.status === 'loading' && (
-          <div className="runtime-loading">
-            <div aria-hidden="true" className="skeleton-list">
+          <div className={styles.runtimeLoading}>
+            <div aria-hidden="true" className={styles.skeletonList}>
               {Array.from({ length: 4 }, (_, index) => (
-                <span className="skeleton-row" key={index}>
-                  <span className="skeleton-label" />
-                  <span className="skeleton-value" />
+                <span className={styles.skeletonRow} key={index}>
+                  <span className={styles.skeletonLabel} />
+                  <span className={styles.skeletonValue} />
                 </span>
               ))}
             </div>
@@ -95,18 +99,22 @@ export function OverviewPage() {
         )}
 
         {state.status === 'error' && (
-          <div className="runtime-error" role="alert">
+          <div className={styles.runtimeError} role="alert">
             <strong>未能读取运行环境</strong>
             <p>{state.message}</p>
-            <button className="retry-button" type="button" onClick={retry}>
+            <button
+              className={styles.retryButton}
+              type="button"
+              onClick={retry}
+            >
               重新连接
             </button>
           </div>
         )}
 
         {state.status === 'success' && (
-          <div className="runtime-result">
-            <dl className="runtime-list">
+          <div>
+            <dl className={styles.runtimeList}>
               <div>
                 <dt>应用版本</dt>
                 <dd>{state.data.appVersion}</dd>
@@ -131,17 +139,17 @@ export function OverviewPage() {
               </div>
             </dl>
 
-            <div className="bridge">
-              <span className="bridge-icon" aria-hidden="true">
+            <div className={styles.bridge}>
+              <span className={styles.bridgeIcon} aria-hidden="true">
                 ✓
               </span>
-              <div className="bridge-copy">
+              <div className={styles.bridgeCopy}>
                 <strong>Preload bridge 已连接</strong>
                 <span>window.desktop.getAppInfo()</span>
               </div>
             </div>
 
-            <p className="runtime-mode">
+            <p className={styles.runtimeMode}>
               {state.data.isPackaged ? '生产构建' : '开发模式'}
             </p>
           </div>

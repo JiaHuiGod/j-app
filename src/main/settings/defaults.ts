@@ -16,7 +16,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     sites: [],
   },
   appearance: {
-    theme: 'system',
+    theme: 'light',
   },
 };
 

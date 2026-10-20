@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { toErrorMessage } from '../lib/errors';
+import ui from '../styles/ui.module.css';
+import styles from './SiteDialogs.module.css';
 
 interface ClearAllSitesDialogProps {
   connectionCount: number;
@@ -94,20 +96,20 @@ export function ClearAllSitesDialog({
     <dialog
       aria-describedby="clear-all-description"
       aria-labelledby="clear-all-title"
-      className="site-dialog"
+      className={styles.dialog}
       ref={dialogRef}
       onCancel={handleCancel}
     >
-      <div className="site-dialog-form">
-        <header className="site-dialog-header">
+      <div className={styles.form}>
+        <header className={styles.header}>
           <span
-            className="site-dialog-icon site-dialog-icon--danger"
+            className={`${styles.icon} ${styles.dangerIcon}`}
             aria-hidden="true"
           >
             <WarningIcon />
           </span>
-          <div className="site-dialog-heading">
-            <p className="site-dialog-kicker site-dialog-kicker--danger">
+          <div className={styles.heading}>
+            <p className={`${styles.kicker} ${styles.kickerDanger}`}>
               Danger zone
             </p>
             <h2 id="clear-all-title">清理全部站点数据</h2>
@@ -117,7 +119,7 @@ export function ClearAllSitesDialog({
           </div>
           <button
             aria-label="关闭清理全部站点数据窗口"
-            className="site-dialog-close"
+            className={styles.close}
             disabled={isClearing}
             title="关闭"
             type="button"
@@ -129,25 +131,25 @@ export function ClearAllSitesDialog({
           </button>
         </header>
 
-        <div className="site-dialog-body">
+        <div className={styles.body}>
           {error && (
-            <div className="proxy-alert" role="alert">
+            <div className={ui.alert} role="alert">
               {error}
             </div>
           )}
 
-          <div className="clear-all-summary">
+          <div className={styles.summary}>
             <strong>{connectionCount} 个站点</strong>
             <span>Cookie、缓存与登录状态</span>
           </div>
 
-          <ul className="clear-all-list">
+          <ul className={styles.list}>
             <li>删除所有站点连接和保存的 Cookie；</li>
             <li>清除对应持久会话中的缓存与站点存储；</li>
             <li>保留网络代理和界面设置，不会影响其他应用数据。</li>
           </ul>
 
-          <div className="clear-all-warning">
+          <div className={styles.warning}>
             <span aria-hidden="true">
               <WarningIcon />
             </span>
@@ -158,9 +160,9 @@ export function ClearAllSitesDialog({
           </div>
         </div>
 
-        <footer className="site-dialog-footer">
+        <footer className={styles.footer}>
           <button
-            className="proxy-button proxy-button--secondary"
+            className={`${ui.button} ${ui.buttonSecondary}`}
             disabled={isClearing}
             ref={cancelButtonRef}
             type="button"
@@ -169,7 +171,7 @@ export function ClearAllSitesDialog({
             取消
           </button>
           <button
-            className="proxy-button proxy-button--danger"
+            className={`${ui.button} ${ui.buttonDanger}`}
             disabled={isClearing}
             type="button"
             onClick={() => {
@@ -179,7 +181,7 @@ export function ClearAllSitesDialog({
             {isClearing ? (
               <>
                 <span
-                  className="proxy-spinner proxy-spinner--small"
+                  className={`${ui.spinner} ${ui.spinnerSmall}`}
                   aria-hidden="true"
                 />
                 正在清理…

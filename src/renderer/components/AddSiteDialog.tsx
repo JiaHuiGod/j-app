@@ -7,7 +7,9 @@ import {
 } from 'react';
 import type { SiteConnectionSummary } from '@shared/connections';
 import { toErrorMessage } from '../lib/errors';
+import ui from '../styles/ui.module.css';
 import { GlobeIcon } from './GlobeIcon';
+import styles from './SiteDialogs.module.css';
 
 interface AddSiteDialogProps {
   onClose: () => void;
@@ -123,22 +125,22 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
     <dialog
       aria-describedby="site-dialog-description"
       aria-labelledby="site-dialog-title"
-      className="site-dialog"
+      className={styles.dialog}
       ref={dialogRef}
       onCancel={handleCancel}
     >
       <form
         autoComplete="off"
-        className="site-dialog-form"
+        className={styles.form}
         noValidate
         onSubmit={handleSubmit}
       >
-        <header className="site-dialog-header">
-          <span className="site-dialog-icon" aria-hidden="true">
+        <header className={styles.header}>
+          <span className={styles.icon} aria-hidden="true">
             <GlobeIcon />
           </span>
-          <div className="site-dialog-heading">
-            <p className="site-dialog-kicker">Connection</p>
+          <div className={styles.heading}>
+            <p className={styles.kicker}>Connection</p>
             <h2 id="site-dialog-title">添加站点</h2>
             <p id="site-dialog-description">
               登录状态会保存在独立、持久化的站点会话中。
@@ -146,7 +148,7 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
           </div>
           <button
             aria-label="关闭添加站点窗口"
-            className="site-dialog-close"
+            className={styles.close}
             disabled={isSubmitting}
             title="关闭"
             type="button"
@@ -158,14 +160,14 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
           </button>
         </header>
 
-        <div className="site-dialog-body">
+        <div className={styles.body}>
           {error && (
-            <div className="proxy-alert" role="alert">
+            <div className={ui.alert} role="alert">
               {error}
             </div>
           )}
 
-          <label className="site-dialog-field">
+          <label className={styles.field}>
             <span>站点名称</span>
             <input
               disabled={isSubmitting}
@@ -181,7 +183,7 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
             />
           </label>
 
-          <label className="site-dialog-field">
+          <label className={styles.field}>
             <span>登录地址</span>
             <input
               disabled={isSubmitting}
@@ -196,7 +198,7 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
             />
           </label>
 
-          <div className="site-dialog-note">
+          <div className={styles.note}>
             <span aria-hidden="true">i</span>
             <p>
               点击下方按钮后会打开独立登录窗口。完成登录后关闭该窗口，应用会检测并保存该站点的
@@ -205,9 +207,9 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
           </div>
         </div>
 
-        <footer className="site-dialog-footer">
+        <footer className={styles.footer}>
           <button
-            className="proxy-button proxy-button--secondary"
+            className={`${ui.button} ${ui.buttonSecondary}`}
             disabled={isSubmitting}
             type="button"
             onClick={requestClose}
@@ -215,14 +217,14 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
             取消
           </button>
           <button
-            className="proxy-button proxy-button--primary"
+            className={`${ui.button} ${ui.buttonPrimary}`}
             disabled={isSubmitting}
             type="submit"
           >
             {isSubmitting ? (
               <>
                 <span
-                  className="proxy-spinner proxy-spinner--small"
+                  className={`${ui.spinner} ${ui.spinnerSmall}`}
                   aria-hidden="true"
                 />
                 等待登录窗口…

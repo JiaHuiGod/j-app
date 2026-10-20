@@ -5,6 +5,9 @@ import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { GlobeIcon } from '../components/GlobeIcon';
 import { ThemeSettings } from '../components/ThemeSettings';
 import { toErrorMessage } from '../lib/errors';
+import page from '../styles/page.module.css';
+import ui from '../styles/ui.module.css';
+import styles from './SettingsPage.module.css';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',
@@ -27,7 +30,12 @@ function formatLoginTime(value: string | null): string {
 
 function PlusIcon() {
   return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+    <svg
+      aria-hidden="true"
+      className={styles.addIcon}
+      focusable="false"
+      viewBox="0 0 16 16"
+    >
       <path d="M8 3.5v9M3.5 8h9" />
     </svg>
   );
@@ -165,19 +173,21 @@ export function SettingsPage() {
   };
 
   return (
-    <main className="settings-page" aria-labelledby="settings-page-title">
-      <header className="settings-page-header">
-        <div className="settings-page-heading">
-          <p className="eyebrow">Preferences / Appearance & Connections</p>
+    <main className={styles.page} aria-labelledby="settings-page-title">
+      <header className={styles.header}>
+        <div className={styles.heading}>
+          <p className={page.eyebrow}>
+            Preferences / Appearance &amp; Connections
+          </p>
           <h1 id="settings-page-title">设置。</h1>
-          <p className="lede">
+          <p className={styles.headingLede}>
             调整应用外观，并管理需要登录的站点。每个站点使用独立的持久会话保存
             Cookie，登录信息不会进入页面或配置文件。
           </p>
         </div>
 
-        <aside className="settings-security">
-          <span className="settings-security-icon" aria-hidden="true">
+        <aside className={styles.security}>
+          <span className={styles.securityIcon} aria-hidden="true">
             <LockIcon />
           </span>
           <div>
@@ -189,15 +199,15 @@ export function SettingsPage() {
 
       <ThemeSettings />
 
-      <section aria-labelledby="connections-title" className="connections-card">
-        <header className="connections-card-header">
+      <section aria-labelledby="connections-title" className={styles.card}>
+        <header className={styles.cardHeader}>
           <div>
-            <p className="settings-kicker">Site sessions</p>
+            <p className={styles.kicker}>Site sessions</p>
             <h2 id="connections-title">站点账号</h2>
             <p>登录站点后关闭登录窗口，应用会检测并保存 Cookie。</p>
           </div>
           <button
-            className="settings-add-button"
+            className={`${ui.button} ${ui.buttonPrimary} ${styles.addButton}`}
             disabled={isLoading || isBusy || isAddOpen}
             type="button"
             onClick={() => {
@@ -210,14 +220,8 @@ export function SettingsPage() {
           </button>
         </header>
 
-        <aside
-          aria-label="站点资源占用提示"
-          className="connections-resource-warning"
-        >
-          <span
-            className="connections-resource-warning-icon"
-            aria-hidden="true"
-          >
+        <aside aria-label="站点资源占用提示" className={styles.warning}>
+          <span className={styles.warningIcon} aria-hidden="true">
             !
           </span>
           <div>
@@ -230,11 +234,11 @@ export function SettingsPage() {
         </aside>
 
         {error && (
-          <div className="connections-error" role="alert">
+          <div className={styles.error} role="alert">
             <span>{error}</span>
             {isLoading === false && connections.length === 0 && (
               <button
-                className="connections-retry"
+                className={styles.retry}
                 type="button"
                 onClick={() => {
                   void loadConnections();
@@ -247,14 +251,14 @@ export function SettingsPage() {
         )}
 
         {isLoading ? (
-          <output className="connections-loading">
-            <span className="proxy-spinner" aria-hidden="true" />
+          <output className={styles.loading}>
+            <span className={ui.spinner} aria-hidden="true" />
             正在读取站点连接…
           </output>
         ) : connections.length === 0 ? (
           !error && (
-            <div className="connections-empty">
-              <span className="connections-empty-icon" aria-hidden="true">
+            <div className={styles.empty}>
+              <span className={styles.emptyIcon} aria-hidden="true">
                 <GlobeIcon />
               </span>
               <div>
@@ -267,7 +271,7 @@ export function SettingsPage() {
             </div>
           )
         ) : (
-          <ul className="connection-list">
+          <ul className={styles.list}>
             {connections.map((connection) => {
               const isConnected = connection.status === 'connected';
               const isConfirming = confirmingId === connection.id;
@@ -275,28 +279,25 @@ export function SettingsPage() {
               const isRemoving = removingId === connection.id;
 
               return (
-                <li className="connection-row" key={connection.id}>
-                  <span className="connection-avatar" aria-hidden="true">
+                <li className={styles.row} key={connection.id}>
+                  <span className={styles.avatar} aria-hidden="true">
                     {connection.name.trim().charAt(0).toUpperCase()}
                   </span>
 
-                  <div className="connection-info">
-                    <div className="connection-title">
+                  <div className={styles.info}>
+                    <div className={styles.title}>
                       <strong>{connection.name}</strong>
                       <span
-                        className={`connection-state${isConnected ? ' is-connected' : ''}`}
+                        className={`${styles.state}${isConnected ? ` ${styles.connected}` : ''}`}
                       >
                         <span aria-hidden="true" />
                         {isConnected ? '已保存' : '未连接'}
                       </span>
                     </div>
-                    <span
-                      className="connection-url"
-                      title={connection.loginUrl}
-                    >
+                    <span className={styles.url} title={connection.loginUrl}>
                       {connection.loginUrl}
                     </span>
-                    <span className="connection-meta">
+                    <span className={styles.meta}>
                       {isConnected
                         ? `${connection.cookieCount} 个 Cookie`
                         : '未检测到 Cookie'}
@@ -305,11 +306,11 @@ export function SettingsPage() {
                     </span>
                   </div>
 
-                  <div className="connection-actions">
+                  <div className={styles.actions}>
                     {isConfirming ? (
                       <>
                         <button
-                          className="connection-action"
+                          className={styles.action}
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
@@ -319,7 +320,7 @@ export function SettingsPage() {
                           取消
                         </button>
                         <button
-                          className="connection-action connection-action--danger"
+                          className={`${styles.action} ${styles.actionDanger}`}
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
@@ -332,7 +333,7 @@ export function SettingsPage() {
                     ) : (
                       <>
                         <button
-                          className="connection-action"
+                          className={styles.action}
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
@@ -346,7 +347,7 @@ export function SettingsPage() {
                               : '登录'}
                         </button>
                         <button
-                          className="connection-action connection-action--quiet"
+                          className={`${styles.action} ${styles.actionQuiet}`}
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
@@ -365,9 +366,9 @@ export function SettingsPage() {
         )}
 
         {loggingInId && (
-          <output className="connections-login-hint">
+          <output className={styles.loginHint}>
             <span
-              className="proxy-spinner proxy-spinner--small"
+              className={`${ui.spinner} ${ui.spinnerSmall}`}
               aria-hidden="true"
             />
             请在登录窗口中完成登录，然后关闭窗口以保存 Cookie。
@@ -375,7 +376,7 @@ export function SettingsPage() {
         )}
 
         {!isLoading && connections.length > 0 && (
-          <div className="connections-danger-zone">
+          <div className={styles.dangerZone}>
             <div>
               <strong>清理全部站点数据</strong>
               <p>
@@ -384,7 +385,7 @@ export function SettingsPage() {
               </p>
             </div>
             <button
-              className="connections-clear-all-button"
+              className={styles.clearAllButton}
               disabled={isBusy}
               type="button"
               onClick={() => {
@@ -398,7 +399,7 @@ export function SettingsPage() {
         )}
       </section>
 
-      <p className="settings-page-note">通用与存储设置将在后续版本加入。</p>
+      <p className={styles.note}>通用与存储设置将在后续版本加入。</p>
 
       {isAddOpen && (
         <AddSiteDialog

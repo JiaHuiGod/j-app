@@ -118,18 +118,30 @@ j-app/
 │  │  │  ├─ ClearAllSitesDialog.tsx # 清理全部站点确认弹窗
 │  │  │  ├─ GlobeIcon.tsx        # 网络代理与站点图标
 │  │  │  ├─ ProxyDialog.tsx      # 代理配置、测试与重启提示弹窗
+│  │  │  ├─ ProxyDialog.module.css # 代理弹窗样式
+│  │  │  ├─ SiteDialogs.module.css # 添加站点与清理全部弹窗共享样式
 │  │  │  ├─ ThemeSettings.tsx    # 三档主题选择与预览
-│  │  │  └─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
+│  │  │  ├─ ThemeSettings.module.css # 主题选择器样式
+│  │  │  ├─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
+│  │  │  └─ TitleBar.module.css  # 标题栏样式、暗色与响应式规则
 │  │  ├─ hooks/
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
 │  │  ├─ lib/
 │  │  │  └─ errors.ts           # IPC 错误消息整理
 │  │  ├─ pages/
 │  │  │  ├─ OverviewPage.tsx     # 概览页
+│  │  │  ├─ OverviewPage.module.css # 概览布局与运行环境
 │  │  │  ├─ DrivePage.tsx        # 网盘占位页
-│  │  │  └─ SettingsPage.tsx     # 外观、账号、资源提示与数据清理
+│  │  │  ├─ DrivePage.module.css # 网盘占位卡片
+│  │  │  ├─ SettingsPage.tsx     # 外观、账号、资源提示与数据清理
+│  │  │  └─ SettingsPage.module.css # 设置页与站点连接
 │  │  ├─ styles/
-│  │  │  └─ global.css
+│  │  │  ├─ global.css          # 全局样式入口
+│  │  │  ├─ tokens.css          # 设计 Token、亮/暗变量
+│  │  │  ├─ base.css            # reset、窗口外壳、页脚与全局暗色规则
+│  │  │  ├─ page.module.css     # 页面共享布局与排版
+│  │  │  ├─ ui.module.css       # 共享按钮、加载指示器与提示框
+│  │  │  └─ reduced-motion.css  # 减少动画偏好
 │  │  ├─ App.test.tsx           # 渲染层测试
 │  │  ├─ App.tsx                # 页面切换与全局状态
 │  │  ├─ navigation.ts          # 主导航配置
@@ -155,6 +167,32 @@ j-app/
 
 `@shared/*` 别名在 TypeScript、三个 Vite 配置和 Vitest 中保持一致，用来引用跨进程契约。进程内部代码使用相对路径，跨边界代码使用别名，避免目录移动时产生大量路径修改。
 
+## 样式组织
+
+`src/renderer/styles/global.css` 只加载全局基础样式：
+
+```css
+@import './tokens.css';
+@import './base.css';
+@import './reduced-motion.css';
+```
+
+- `tokens.css`：颜色、字体、尺寸变量，以及亮/暗两套根变量；
+- `base.css`：reset、应用外壳、页脚、全局 `h1` 与全局暗色背景；
+- `reduced-motion.css`：操作系统“减少动画”偏好的全局兜底；
+- `page.module.css`：页面共享的内容宽度、网格、标题排版和标签；
+- `ui.module.css`：共享按钮、Spinner 和提示框；
+- 其余样式全部放在组件或页面旁，通过 CSS Modules 显式导入。
+
+每个功能模块自己负责以下内容，不再依赖集中式覆盖：
+
+- 亮色与暗色规则；
+- 980px / 680px 断点；
+- 组件进入动画的局部 `@keyframes`；
+- 只属于该组件的状态修饰符。
+
+这样删除或移动组件时，样式会一起被删除或移动，不会留下无法判断归属的全局选择器。
+
 ## 应用图标
 
 `public/favicon.svg` 同时承担两个角色：
@@ -174,10 +212,10 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 - macOS 使用 `hiddenInset`，保留原生红绿灯，隐藏自定义窗口按钮；
 - 标题栏整体设置为 `-webkit-app-region: drag`，导航和窗口按钮等交互元素设置为 `no-drag`。
 
-布局和大致的扩展位置在 [`src/renderer/components/TitleBar.tsx`](src/renderer/components/TitleBar.tsx)：
+布局和大致的扩展位置在 [`src/renderer/components/TitleBar.tsx`](src/renderer/components/TitleBar.tsx)，对应样式在同目录的 `TitleBar.module.css`：
 
-- `titlebar-nav`：数据驱动的主导航，当前包含“概览 / 网盘 / 设置”；
-- `titlebar-actions`：全局工具按钮区域，目前包含“网络代理”入口，也可继续添加搜索、通知等操作；
+- 导航区域：数据驱动的主导航，当前包含“概览 / 网盘 / 设置”；
+- 工具区域：全局工具按钮区域，目前包含“网络代理”入口，也可继续添加搜索、通知等操作；
 - 中间留白同时作为拖拽窗口的区域。
 
 窗口控制通过 `window.desktop.windowControls` 暴露，渲染层拿不到原始 `ipcRenderer`。主进程根据 IPC 发送者定位窗口，并在最大化状态变化时广播事件，按钮图标会随之切换。开发模式启动时会自动在独立窗口打开 DevTools，也可以使用 `F12` 或 `Ctrl/Cmd + Shift + I` 手动切换；生产构建不会自动打开。
@@ -200,13 +238,14 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 ![设置页：外观与站点账号](docs/settings-page.png)
 
-页面复用当前视觉 Token；概览和网盘使用 `.content` 栅格，设置页使用 `.settings-page`。窗口宽度低于 980px 时自动切换为单列，已验证在 900×620 的最小窗口尺寸下没有横向溢出。
+页面复用当前视觉 Token；概览和网盘共享 `page.module.css` 的内容栅格与排版，设置页在 `SettingsPage.module.css` 中维护自己的页面结构。窗口宽度低于 980px 时自动切换为单列，已验证在 900×620 的最小窗口尺寸下没有横向溢出。
 
 新增页面时：
 
 1. 在 `navigation.ts` 中加入新的导航项；
-2. 在 `src/renderer/pages/` 中创建页面组件；
-3. 在 `App.tsx` 中注册页面渲染分支。
+2. 在 `src/renderer/pages/` 中创建页面组件和同名 `.module.css`；
+3. 优先复用 `page.module.css` 的页面布局与 `ui.module.css` 的控件；
+4. 在 `App.tsx` 中注册页面渲染分支。
 
 当页面需要浏览器历史、深链或返回/前进能力时，再引入 React Router（Electron 下使用 `HashRouter`），当前阶段不提前增加依赖。
 
@@ -214,9 +253,9 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 设置页提供三档主题：
 
-- **跟随系统**：默认值，随操作系统外观自动切换；
-- **浅色**：始终使用明亮界面；
-- **深色**：始终使用暗色界面。
+- **浅色**：默认值，始终使用明亮界面；
+- **深色**：始终使用暗色界面；
+- **跟随系统**：随操作系统外观自动切换。
 
 主题保存在 `settings.json` 的 `appearance.theme`，主进程在创建窗口前写入 `nativeTheme.themeSource`，因此首屏直接使用正确主题，不会出现浅色闪烁。渲染层通过 `@media (prefers-color-scheme: dark)` 选择整套暗色 Token，并同步 `color-scheme`、滚动条、输入控件和原生弹窗背景。
 
@@ -299,7 +338,7 @@ app.getPath('userData')/settings.json
 
 - **只有主进程读写文件**。渲染层通过 `window.desktop` 的窄接口访问，避免多处写入、路径漂移和权限问题。
 - **结构集中在 `src/shared/settings.ts`**。新增设置时增加 section（如 `appearance`、`editor`），配置文件仍是同一个。
-- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。版本 1/2 配置会自动迁移到版本 3：补充空的 `connections` 和默认的 `appearance.theme`。
+- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。版本 1/2 配置会自动迁移到版本 3：补充空的 `connections`，并写入 `appearance.theme = "system"`。
 - **原子写入**。先写同目录临时文件、同步落盘，再 rename 到目标文件，避免中途退出留下半截 JSON。
 - **不用 `.env`**。`.env` 是构建时配置，不是用户运行时状态；也不应把用户代理写进仓库。
 - **配置与凭据分层**。站点 Cookie 属于登录凭据，不进入 `settings.json`，而是交给 Chromium 的加密持久分区。集中配置只保存站点 ID、名称、URL 和登录时间。

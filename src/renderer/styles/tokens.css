@@ -1,0 +1,40 @@
+/* Design tokens and root typography. */
+
+:root {
+  font-family:
+    'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  color: #17191f;
+  background: #f4f1e8;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #17191f;
+  --muted: #6b6e77;
+  --paper: #f4f1e8;
+  --surface: #fffdf8;
+  --line: rgb(23 25 31 / 12%);
+  --blue: #2148ff;
+  --lime: #cef36b;
+  --success: #1f8a4d;
+  --danger: #d74449;
+  --radius: 24px;
+  --titlebar-height: 38px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f2efe7;
+    background: #0f1116;
+    color-scheme: dark;
+    --ink: #f2efe7;
+    --muted: #a5a8b2;
+    --paper: #0f1116;
+    --surface: #1a1d24;
+    --line: rgb(242 239 231 / 12%);
+    --blue: #839bff;
+    --success: #6fd395;
+    --danger: #ff7d82;
+  }
+}

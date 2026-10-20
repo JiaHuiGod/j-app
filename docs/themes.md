@@ -4,9 +4,9 @@
 
 应用支持三种主题偏好：
 
-- **跟随系统**：默认值，随操作系统外观自动切换；
-- **浅色**：固定使用明亮界面；
-- **深色**：固定使用暗色界面。
+- **浅色**：默认值，固定使用明亮界面；
+- **深色**：固定使用暗色界面；
+- **跟随系统**：随操作系统外观自动切换。
 
 主题保存在中心配置中，启动时在创建窗口之前应用，避免先渲染浅色再切换造成的闪烁。
 
@@ -40,17 +40,21 @@ Renderer CSS
 
 关键文件：
 
-| 文件                                        | 职责                               |
-| ------------------------------------------- | ---------------------------------- |
-| `src/shared/appearance.ts`                  | 主题偏好、解析结果与状态类型       |
-| `src/main/appearance/theme.ts`              | 启动应用主题、切换主题、窗口背景色 |
-| `src/main/settings/schema.ts`               | v1/v2 → v3 迁移与主题校验          |
-| `src/main/settings/store.ts`                | 持久化 `appearance.theme`          |
-| `src/renderer/components/ThemeSettings.tsx` | 三档主题选择和预览                 |
-| `src/renderer/pages/SettingsPage.tsx`       | 设置页组合                         |
-| `src/renderer/styles/global.css`            | 主题变量、浅色样式与暗色覆盖       |
-| `src/main/window.ts`                        | 启动窗口背景色                     |
-| `src/main/connections/session-manager.ts`   | 登录窗口背景色                     |
+| 文件                                               | 职责                               |
+| -------------------------------------------------- | ---------------------------------- |
+| `src/shared/appearance.ts`                         | 主题偏好、解析结果与状态类型       |
+| `src/main/appearance/theme.ts`                     | 启动应用主题、切换主题、窗口背景色 |
+| `src/main/settings/schema.ts`                      | v1/v2 → v3 迁移与主题校验          |
+| `src/main/settings/store.ts`                       | 持久化 `appearance.theme`          |
+| `src/renderer/components/ThemeSettings.tsx`        | 三档主题选择和预览                 |
+| `src/renderer/components/ThemeSettings.module.css` | 主题选择器、暗色与响应式样式       |
+| `src/renderer/components/TitleBar.module.css`      | 标题栏暗色与响应式样式             |
+| `src/renderer/pages/SettingsPage.module.css`       | 设置页、站点卡片与暗色状态         |
+| `src/renderer/styles/global.css`                   | 全局样式入口                       |
+| `src/renderer/styles/tokens.css`                   | 亮/暗设计 Token                    |
+| `src/renderer/styles/base.css`                     | 应用外壳与全局暗色背景             |
+| `src/main/window.ts`                               | 启动窗口背景色                     |
+| `src/main/connections/session-manager.ts`          | 登录窗口背景色                     |
 
 ## 3. 配置与迁移
 
@@ -76,9 +80,9 @@ Renderer CSS
 }
 ```
 
-- 新安装默认 `theme: "system"`；
-- v1 配置迁移时同时补充空连接列表和默认主题；
-- v2 配置迁移时保留已有站点连接并补充 `appearance`；
+- 新安装默认 `theme: "light"`；
+- v1 配置迁移时补充空连接列表，并写入 `theme: "system"`；
+- v2 配置迁移时保留已有站点连接，并写入 `theme: "system"`；
 - 非法主题值会被 Zod 拒绝；
 - 迁移完成后由 store 写回 v3。
 
@@ -107,7 +111,7 @@ Electron 的 `nativeTheme.themeSource` 会同步影响渲染进程的 `prefers-c
 
 ## 5. CSS 实现
 
-基础颜色由 `:root` 中的 Token 控制，暗色模式集中定义在：
+基础颜色由 `tokens.css` 中的亮色 `:root` 与暗色 `@media` 变量控制。应用外壳、页面背景和全局元素的暗色规则在 `base.css`；标题栏、主题选择器、页面、弹窗和共享控件的暗色规则各自随 CSS Module 加载，不再维护集中式 `theme-dark.css`。
 
 ```css
 @media (prefers-color-scheme: dark) {
@@ -159,7 +163,7 @@ Electron 的 `nativeTheme.themeSource` 会同步影响渲染进程的 `prefers-c
 - Vitest 覆盖主题选择交互、配置迁移和主题值校验；
 - 打包应用无渲染层异常或控制台错误。
 
-当前测试总数为 24 个，`pnpm check` 全部通过。
+当前测试总数为 25 个，`pnpm check` 全部通过。
 
 ## 8. 已知限制
 

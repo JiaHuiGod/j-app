@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NAVIGATION_ITEMS, type AppPage } from '../navigation';
 import { AppMark } from './AppMark';
 import { GlobeIcon } from './GlobeIcon';
+import styles from './TitleBar.module.css';
 
 interface TitleBarProps {
   activePage: AppPage;
@@ -45,22 +46,22 @@ export function TitleBar({
   }, [windowControls]);
 
   return (
-    <header className={`titlebar${isMac ? ' titlebar--mac' : ''}`}>
-      <div className="titlebar-brand">
+    <header className={`${styles.titlebar}${isMac ? ` ${styles.mac}` : ''}`}>
+      <div className={styles.brand}>
         <AppMark size={22} />
-        <span className="titlebar-app-name">J App</span>
+        <span className={styles.appName}>J App</span>
       </div>
 
-      <span className="titlebar-divider" aria-hidden="true" />
+      <span className={styles.divider} aria-hidden="true" />
 
-      <nav className="titlebar-nav" aria-label="主导航">
+      <nav className={styles.nav} aria-label="主导航">
         {NAVIGATION_ITEMS.map((item) => {
           const isActive = item.id === activePage;
 
           return (
             <button
               aria-current={isActive ? 'page' : undefined}
-              className={`titlebar-nav-item${isActive ? ' titlebar-nav-item--active' : ''}`}
+              className={`${styles.navItem}${isActive ? ` ${styles.active}` : ''}`}
               key={item.id}
               type="button"
               onClick={() => {
@@ -73,28 +74,28 @@ export function TitleBar({
         })}
       </nav>
 
-      <div className="titlebar-drag-space" aria-hidden="true" />
+      <div className={styles.dragSpace} aria-hidden="true" />
 
-      <div className="titlebar-actions">
+      <div className={styles.actions}>
         <button
           aria-label={`网络代理，当前${proxyEnabled ? '已开启' : '未开启'}`}
-          className={`titlebar-action${proxyEnabled ? ' is-enabled' : ''}`}
+          className={`${styles.action}${proxyEnabled ? ` ${styles.enabled}` : ''}`}
           title={`网络代理：${proxyEnabled ? '已开启' : '未开启'}`}
           type="button"
           onClick={onOpenProxySettings}
         >
-          <GlobeIcon className="titlebar-action-icon" />
+          <GlobeIcon className={styles.actionIcon} />
           <span>代理</span>
-          <span className="titlebar-action-dot" aria-hidden="true" />
+          <span className={styles.actionDot} aria-hidden="true" />
         </button>
         {/* Add global toolbar actions here. */}
       </div>
 
       {!isMac && (
-        <div className="window-controls">
+        <div className={styles.windowControls}>
           <button
             aria-label="最小化"
-            className="window-control"
+            className={styles.windowControl}
             title="最小化"
             type="button"
             onClick={windowControls.minimize}
@@ -106,7 +107,7 @@ export function TitleBar({
 
           <button
             aria-label={isMaximized ? '还原' : '最大化'}
-            className="window-control"
+            className={styles.windowControl}
             title={isMaximized ? '还原' : '最大化'}
             type="button"
             onClick={windowControls.toggleMaximize}
@@ -125,7 +126,7 @@ export function TitleBar({
 
           <button
             aria-label="关闭"
-            className="window-control window-control--close"
+            className={`${styles.windowControl} ${styles.close}`}
             title="关闭"
             type="button"
             onClick={windowControls.close}
