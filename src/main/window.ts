@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import { IpcChannel } from '@shared/ipc';
+import { getWindowBackgroundColor } from './appearance/theme';
 
-const WINDOW_BACKGROUND = '#f4f1e8';
 const WINDOW_ICON = app.isPackaged
   ? path.join(process.resourcesPath, 'icon.png')
   : path.join(__dirname, '../../resources/icon.png');
@@ -123,7 +123,7 @@ export function createMainWindow(): BrowserWindow {
     minHeight: 620,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: WINDOW_BACKGROUND,
+    backgroundColor: getWindowBackgroundColor(),
     title: 'J App',
     icon: WINDOW_ICON,
     ...WINDOW_CHROME,

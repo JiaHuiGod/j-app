@@ -2,7 +2,7 @@
 
 一个面向实际开发起步的 Electron 桌面应用工程：**Electron Forge + Vite + React 19 + TypeScript**。
 
-项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、网络代理、页面导航和按站点隔离的 Cookie 会话管理。
+项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航和按站点隔离的 Cookie 会话管理。
 
 ![J App 运行预览](docs/preview.png)
 
@@ -67,11 +67,14 @@ pnpm precommit
 j-app/
 ├─ docs/
 │  ├─ preview.png               # 主界面截图
+│  ├─ preview-dark.png          # 深色概览截图
 │  ├─ drive-page.png            # 网盘占位页
-│  ├─ settings-page.png         # 账号与连接设置页
+│  ├─ settings-page.png         # 浅色设置页
+│  ├─ settings-dark.png         # 深色设置页
 │  ├─ cookie-dialog.png         # 添加站点登录弹窗
 │  ├─ clear-all-dialog.png      # 清理全部站点确认弹窗
 │  ├─ cookie-sessions.md        # 站点 Cookie 会话功能文档
+│  ├─ themes.md                 # 主题与外观功能文档
 │  ├─ proxy-dialog.png          # 网络代理弹窗
 │  ├─ proxy-saved.png           # 开启代理后的重启提示
 │  └─ proxy-saved-off.png       # 关闭代理后的重启提示
@@ -88,6 +91,8 @@ j-app/
 ├─ .lintstagedrc.json           # 暂存文件的 Oxlint/Oxfmt 自动修复规则
 ├─ src/
 │  ├─ main/                     # 主进程：拥有系统权限
+│  │  ├─ appearance/
+│  │  │  └─ theme.ts            # nativeTheme、主题持久化与启动应用
 │  │  ├─ connections/
 │  │  │  ├─ partition-cleanup.ts # 启动时清理无主站点分区
 │  │  │  ├─ partition.ts         # 分区命名与无主分区识别
@@ -113,6 +118,7 @@ j-app/
 │  │  │  ├─ ClearAllSitesDialog.tsx # 清理全部站点确认弹窗
 │  │  │  ├─ GlobeIcon.tsx        # 网络代理与站点图标
 │  │  │  ├─ ProxyDialog.tsx      # 代理配置、测试与重启提示弹窗
+│  │  │  ├─ ThemeSettings.tsx    # 三档主题选择与预览
 │  │  │  └─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
 │  │  ├─ hooks/
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
@@ -121,7 +127,7 @@ j-app/
 │  │  ├─ pages/
 │  │  │  ├─ OverviewPage.tsx     # 概览页
 │  │  │  ├─ DrivePage.tsx        # 网盘占位页
-│  │  │  └─ SettingsPage.tsx     # 账号、资源提示与数据清理
+│  │  │  └─ SettingsPage.tsx     # 外观、账号、资源提示与数据清理
 │  │  ├─ styles/
 │  │  │  └─ global.css
 │  │  ├─ App.test.tsx           # 渲染层测试
@@ -129,6 +135,7 @@ j-app/
 │  │  ├─ navigation.ts          # 主导航配置
 │  │  └─ main.tsx               # React 入口
 │  ├─ shared/                   # 三端共享的纯类型与契约
+│  │  ├─ appearance.ts          # 主题偏好与解析状态
 │  │  ├─ connections.ts         # 站点连接与 Cookie 摘要类型
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
 │  │  ├─ settings.ts            # 应用设置与代理数据类型
@@ -181,7 +188,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 - **概览**：现有工程自检与运行环境
 - **网盘**：已接入导航的占位页，用于后续文件浏览和传输功能
-- **设置**：站点账号与 Cookie 会话管理，网络代理仍保持从标题栏独立打开
+- **设置**：应用主题外观与站点账号管理，网络代理仍保持从标题栏独立打开
 
 导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换时会回到内容顶部，并使用 `aria-current` 标记当前页面。
 
@@ -191,7 +198,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 设置页面：
 
-![账号与连接设置页](docs/settings-page.png)
+![设置页：外观与站点账号](docs/settings-page.png)
 
 页面复用当前视觉 Token；概览和网盘使用 `.content` 栅格，设置页使用 `.settings-page`。窗口宽度低于 980px 时自动切换为单列，已验证在 900×620 的最小窗口尺寸下没有横向溢出。
 
@@ -202,6 +209,28 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 3. 在 `App.tsx` 中注册页面渲染分支。
 
 当页面需要浏览器历史、深链或返回/前进能力时，再引入 React Router（Electron 下使用 `HashRouter`），当前阶段不提前增加依赖。
+
+## 主题与外观
+
+设置页提供三档主题：
+
+- **跟随系统**：默认值，随操作系统外观自动切换；
+- **浅色**：始终使用明亮界面；
+- **深色**：始终使用暗色界面。
+
+主题保存在 `settings.json` 的 `appearance.theme`，主进程在创建窗口前写入 `nativeTheme.themeSource`，因此首屏直接使用正确主题，不会出现浅色闪烁。渲染层通过 `@media (prefers-color-scheme: dark)` 选择整套暗色 Token，并同步 `color-scheme`、滚动条、输入控件和原生弹窗背景。
+
+深色设置页：
+
+![深色设置页](docs/settings-dark.png)
+
+深色概览：
+
+![深色概览](docs/preview-dark.png)
+
+主题切换会立即生效并持久化；系统模式下操作系统变更会由 Chromium 自动反映到界面，不需要重启。站点登录窗口使用匹配的窗口背景，但第三方网页本身的颜色由站点控制。
+
+完整设计、CSS 策略、配置迁移和验证记录见 [主题与外观文档](docs/themes.md)。
 
 ## 站点 Cookie 会话
 
@@ -240,7 +269,7 @@ app.getPath('userData')/settings.json
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "network": {
     "proxy": {
       "enabled": true,
@@ -259,6 +288,9 @@ app.getPath('userData')/settings.json
         "lastLoginAt": "2026-10-21T02:10:00.000Z"
       }
     ]
+  },
+  "appearance": {
+    "theme": "system"
   }
 }
 ```
@@ -267,11 +299,11 @@ app.getPath('userData')/settings.json
 
 - **只有主进程读写文件**。渲染层通过 `window.desktop` 的窄接口访问，避免多处写入、路径漂移和权限问题。
 - **结构集中在 `src/shared/settings.ts`**。新增设置时增加 section（如 `appearance`、`editor`），配置文件仍是同一个。
-- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。版本 1 配置会自动迁移到版本 2 并补充空的 `connections`。
+- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。版本 1/2 配置会自动迁移到版本 3：补充空的 `connections` 和默认的 `appearance.theme`。
 - **原子写入**。先写同目录临时文件、同步落盘，再 rename 到目标文件，避免中途退出留下半截 JSON。
 - **不用 `.env`**。`.env` 是构建时配置，不是用户运行时状态；也不应把用户代理写进仓库。
 - **配置与凭据分层**。站点 Cookie 属于登录凭据，不进入 `settings.json`，而是交给 Chromium 的加密持久分区。集中配置只保存站点 ID、名称、URL 和登录时间。
-- **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力由标题栏上下文入口打开独立弹窗；账号与连接则放在设置页集中管理。
+- **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力由标题栏上下文入口打开独立弹窗；外观与账号连接则放在设置页集中管理。
 
 后续新增配置时，在 `AppSettings`、Zod schema、默认值和对应的 IPC 方法中扩展同一个结构。若修改已有字段的语义，需要提升 `schemaVersion` 并在 store 中加入迁移逻辑。当前版本不保存账号密码；Cookie 由独立 Session 保存，不写入 JSON；如果将来需要代理认证，密码应使用 Electron `safeStorage` 单独加密。
 
@@ -314,7 +346,7 @@ app.getPath('userData')/settings.json
 contextBridge.exposeInMainWorld('desktop', Object.freeze(desktopApi));
 ```
 
-类型来自 `src/shared/ipc.ts` 中的 `DesktopApi`，渲染层通过 `window.desktop` 获得完整补全。网络代理同样通过 `window.desktop.settings` 的 `getProxy`、`saveProxy`、`testProxy` 三个窄接口访问，不暴露文件路径或任意读写能力。
+类型来自 `src/shared/ipc.ts` 中的 `DesktopApi`，渲染层通过 `window.desktop` 获得完整补全。网络代理通过 `window.desktop.settings` 的窄接口访问，主题通过 `window.desktop.appearance` 访问，站点会话通过 `window.desktop.connections` 访问；不暴露文件路径或任意读写能力。
 
 ### Renderer
 

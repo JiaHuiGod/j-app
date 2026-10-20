@@ -6,6 +6,7 @@ import type {
   SiteConnectionSummary,
 } from '@shared/connections';
 import { applyProxyToSession } from '../network/proxy';
+import { getWindowBackgroundColor } from '../appearance/theme';
 import {
   addSiteConnection,
   findSiteConnection,
@@ -74,7 +75,7 @@ function prepareLoginWindow(
     parent: parent ?? undefined,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#f4f1e8',
+    backgroundColor: getWindowBackgroundColor(),
     title: `登录 ${connection.name} — 完成后关闭窗口`,
     webPreferences: {
       partition,

@@ -8,12 +8,15 @@ export const DEFAULT_PROXY_SETTINGS: ProxySettings = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   network: {
     proxy: DEFAULT_PROXY_SETTINGS,
   },
   connections: {
     sites: [],
+  },
+  appearance: {
+    theme: 'system',
   },
 };
 

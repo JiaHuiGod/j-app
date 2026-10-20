@@ -1,3 +1,4 @@
+import type { AppearanceState, ThemePreference } from './appearance';
 import type {
   CreateSiteConnectionInput,
   SiteConnectionSummary,
@@ -18,6 +19,8 @@ export const IpcChannel = {
   GetProxySettings: 'settings:get-proxy',
   SaveProxySettings: 'settings:save-proxy',
   TestProxySettings: 'settings:test-proxy',
+  GetAppearance: 'appearance:get',
+  SetAppearanceTheme: 'appearance:set-theme',
   RestartApp: 'app:restart',
   ListSiteConnections: 'connections:list',
   CreateSiteConnection: 'connections:create',
@@ -51,6 +54,11 @@ export interface SettingsApi {
   testProxy: (settings: ProxySettings) => Promise<ProxyTestResult>;
 }
 
+export interface AppearanceApi {
+  get: () => Promise<AppearanceState>;
+  setTheme: (theme: ThemePreference) => Promise<AppearanceState>;
+}
+
 export interface ConnectionsApi {
   list: () => Promise<readonly SiteConnectionSummary[]>;
   create: (input: CreateSiteConnectionInput) => Promise<SiteConnectionSummary>;
@@ -68,6 +76,7 @@ export interface DesktopApi {
   readonly getAppInfo: () => Promise<AppInfo>;
   readonly windowControls: WindowControls;
   readonly settings: SettingsApi;
+  readonly appearance: AppearanceApi;
   readonly connections: ConnectionsApi;
   readonly restartApp: () => void;
 }

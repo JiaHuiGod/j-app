@@ -14,9 +14,9 @@
 - 站点 Session 使用标准桌面 Chrome UA 和语言头，降低普通网站误判 Electron 客户端的情况；
 - 可随时重新登录或删除会话。
 
-当前入口位于 **设置 → 账号与连接**。
+当前入口位于 **设置 → 站点账号**。
 
-![账号与连接](settings-page.png)
+![设置页](settings-page.png)
 
 ![清理全部站点数据](clear-all-dialog.png)
 
@@ -71,7 +71,7 @@ Main
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "network": {
     "proxy": {
       "enabled": false,
@@ -90,6 +90,9 @@ Main
         "lastLoginAt": "2026-10-21T02:10:00.000Z"
       }
     ]
+  },
+  "appearance": {
+    "theme": "system"
   }
 }
 ```
@@ -335,11 +338,13 @@ interface SiteConnectionSummary {
 
 ## 9. 配置版本迁移
 
-配置从 `schemaVersion: 1` 升级到 `2`：
+配置从 `schemaVersion: 1 / 2` 升级到 `3`：
 
 - v1 中的 `network.proxy` 保留；
 - 自动增加 `connections.sites = []`；
-- 启动时完成校验并写回 v2；
+- v2 中已有的站点连接保留；
+- 所有旧版本自动补充 `appearance.theme = "system"`；
+- 启动时完成校验并写回 v3；
 - 无效配置仍按既有策略备份为 `settings.invalid-<timestamp>.json`。
 
 迁移集中在 `src/main/settings/schema.ts`，存储写入逻辑在 `src/main/settings/store.ts`。

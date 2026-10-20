@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { THEME_PREFERENCES, type ThemePreference } from '@shared/appearance';
 import type {
   CreateSiteConnectionInput,
   SiteConnection,
@@ -114,12 +115,25 @@ const legacyAppSettingsSchema = z.object({
   }),
 });
 
-const appSettingsSchema = z.object({
+const versionTwoAppSettingsSchema = z.object({
   schemaVersion: z.literal(2),
   network: z.object({
     proxy: proxySettingsSchema,
   }),
   connections: connectionsSchema,
+});
+
+const appearanceSchema = z.object({
+  theme: z.enum(THEME_PREFERENCES),
+});
+
+const appSettingsSchema = z.object({
+  schemaVersion: z.literal(3),
+  network: z.object({
+    proxy: proxySettingsSchema,
+  }),
+  connections: connectionsSchema,
+  appearance: appearanceSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -159,10 +173,35 @@ export function parseAppSettings(input: unknown): AppSettings {
     }
 
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       network: legacyResult.data.network,
       connections: {
         sites: [],
+      },
+      appearance: {
+        theme: 'system',
+      },
+    };
+  }
+
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'schemaVersion' in input &&
+    input.schemaVersion === 2
+  ) {
+    const versionTwoResult = versionTwoAppSettingsSchema.safeParse(input);
+
+    if (!versionTwoResult.success) {
+      throw new Error(formatSchemaError(versionTwoResult.error));
+    }
+
+    return {
+      schemaVersion: 3,
+      network: versionTwoResult.data.network,
+      connections: versionTwoResult.data.connections,
+      appearance: {
+        theme: 'system',
       },
     };
   }
@@ -171,6 +210,16 @@ export function parseAppSettings(input: unknown): AppSettings {
 
   if (!result.success) {
     throw new Error(formatSchemaError(result.error));
+  }
+
+  return result.data;
+}
+
+export function parseThemePreference(input: unknown): ThemePreference {
+  const result = appearanceSchema.shape.theme.safeParse(input);
+
+  if (!result.success) {
+    throw new Error('主题设置格式不正确。');
   }
 
   return result.data;

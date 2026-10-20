@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AppearanceState } from '@shared/appearance';
 import type { SiteConnectionSummary } from '@shared/connections';
 import type {
+  AppearanceApi,
   AppInfo,
   ConnectionsApi,
   DesktopApi,
@@ -28,6 +30,11 @@ const proxySettings: ProxySettings = {
   port: 7890,
 };
 
+const appearanceState: AppearanceState = {
+  preference: 'system',
+  resolved: 'light',
+};
+
 const siteConnection: SiteConnectionSummary = {
   id: '0f2a63a7-0a9f-4b0a-9d0b-6b8e1c1a2f5d',
   name: 'GitHub',
@@ -50,6 +57,8 @@ let createConnection: ReturnType<typeof vi.fn<ConnectionsApi['create']>>;
 let loginConnection: ReturnType<typeof vi.fn<ConnectionsApi['login']>>;
 let removeConnection: ReturnType<typeof vi.fn<ConnectionsApi['remove']>>;
 let clearAllConnections: ReturnType<typeof vi.fn<ConnectionsApi['clearAll']>>;
+let getAppearance: ReturnType<typeof vi.fn<AppearanceApi['get']>>;
+let setAppearanceTheme: ReturnType<typeof vi.fn<AppearanceApi['setTheme']>>;
 
 beforeEach(() => {
   getAppInfo = vi.fn<() => Promise<AppInfo>>().mockResolvedValue(appInfo);
@@ -74,6 +83,15 @@ beforeEach(() => {
   clearAllConnections = vi
     .fn<ConnectionsApi['clearAll']>()
     .mockResolvedValue(1);
+  getAppearance = vi
+    .fn<AppearanceApi['get']>()
+    .mockResolvedValue(appearanceState);
+  setAppearanceTheme = vi
+    .fn<AppearanceApi['setTheme']>()
+    .mockImplementation(async (theme) => ({
+      preference: theme,
+      resolved: theme === 'dark' ? 'dark' : 'light',
+    }));
 
   const settings: SettingsApi = {
     getProxy,
@@ -91,6 +109,10 @@ beforeEach(() => {
     remove: removeConnection,
     clearAll: clearAllConnections,
   };
+  const appearance: AppearanceApi = {
+    get: getAppearance,
+    setTheme: setAppearanceTheme,
+  };
   const windowControls: DesktopApi['windowControls'] = {
     minimize: vi.fn<() => void>(),
     toggleMaximize,
@@ -105,6 +127,7 @@ beforeEach(() => {
     getAppInfo,
     windowControls,
     settings,
+    appearance,
     connections,
     restartApp,
   };
@@ -183,7 +206,7 @@ describe('App', () => {
     expect(
       await screen.findByRole('heading', {
         level: 1,
-        name: /账号与连接/,
+        name: /设置/,
       }),
     ).toBeDefined();
     expect(await screen.findByText('还没有保存的站点')).toBeDefined();
@@ -282,5 +305,24 @@ describe('App', () => {
     expect(await screen.findByText('还没有保存的站点')).toBeDefined();
     expect(clearAllConnections).toHaveBeenCalledOnce();
     expect(screen.queryByText('GitHub')).toBeNull();
+  });
+
+  it('changes the appearance theme from the settings page', async () => {
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+    const darkOption = await screen.findByRole('radio', {
+      name: /深色/,
+    });
+    fireEvent.click(darkOption);
+
+    expect(setAppearanceTheme).toHaveBeenCalledWith('dark');
+    expect(
+      await screen.findByRole('radio', { name: /深色/, checked: true }),
+    ).toBeDefined();
   });
 });

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { IpcChannel, type AppInfo } from '@shared/ipc';
+import { getAppearanceState, setAppearanceTheme } from './appearance/theme';
 import {
   clearAllSiteConnectionData,
   createSiteConnection,
@@ -41,6 +42,10 @@ export function registerIpcHandlers(): void {
   );
   ipcMain.handle(IpcChannel.TestProxySettings, (_event, settings: unknown) =>
     testProxySettings(settings),
+  );
+  ipcMain.handle(IpcChannel.GetAppearance, () => getAppearanceState());
+  ipcMain.handle(IpcChannel.SetAppearanceTheme, (_event, theme: unknown) =>
+    setAppearanceTheme(theme),
   );
   ipcMain.handle(IpcChannel.ListSiteConnections, () => listSiteConnections());
   ipcMain.handle(IpcChannel.CreateSiteConnection, (_event, input: unknown) =>

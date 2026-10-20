@@ -3,6 +3,7 @@ import {
   parseAppSettings,
   parseCreateSiteConnectionInput,
   parseProxySettings,
+  parseThemePreference,
 } from './schema';
 
 const disabledProxy = {
@@ -46,7 +47,7 @@ describe('proxy settings validation', () => {
 });
 
 describe('application settings migration', () => {
-  it('migrates version 1 settings and adds an empty connections section', () => {
+  it('migrates version 1 settings and adds defaults', () => {
     const migrated = parseAppSettings({
       schemaVersion: 1,
       network: {
@@ -55,17 +56,20 @@ describe('application settings migration', () => {
     });
 
     expect(migrated).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       network: {
         proxy: disabledProxy,
       },
       connections: {
         sites: [],
       },
+      appearance: {
+        theme: 'system',
+      },
     });
   });
 
-  it('accepts version 2 site connection metadata', () => {
+  it('migrates version 2 settings and preserves site connections', () => {
     const settings = parseAppSettings({
       schemaVersion: 2,
       network: {
@@ -84,21 +88,55 @@ describe('application settings migration', () => {
       },
     });
 
+    expect(settings.schemaVersion).toBe(3);
     expect(settings.connections.sites).toHaveLength(1);
+    expect(settings.appearance.theme).toBe('system');
+  });
+
+  it('accepts version 3 theme preferences', () => {
+    const settings = parseAppSettings({
+      schemaVersion: 3,
+      network: {
+        proxy: disabledProxy,
+      },
+      connections: {
+        sites: [],
+      },
+      appearance: {
+        theme: 'dark',
+      },
+    });
+
+    expect(settings.appearance.theme).toBe('dark');
   });
 
   it('rejects unsupported settings versions', () => {
     expect(() =>
       parseAppSettings({
-        schemaVersion: 3,
+        schemaVersion: 4,
         network: {
           proxy: disabledProxy,
         },
         connections: {
           sites: [],
         },
+        appearance: {
+          theme: 'system',
+        },
       }),
     ).toThrow(/schemaVersion|Invalid input|expected/i);
+  });
+});
+
+describe('theme preference validation', () => {
+  it('accepts all supported theme preferences', () => {
+    expect(parseThemePreference('system')).toBe('system');
+    expect(parseThemePreference('light')).toBe('light');
+    expect(parseThemePreference('dark')).toBe('dark');
+  });
+
+  it('rejects an unknown theme preference', () => {
+    expect(() => parseThemePreference('sepia')).toThrow(/主题/);
   });
 });
 

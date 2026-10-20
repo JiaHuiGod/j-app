@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
+import { applyThemePreference } from './appearance/theme';
 import { cleanupOrphanSitePartitions } from './connections/partition-cleanup';
 import { registerIpcHandlers } from './ipc';
 import { applyProxySettings } from './network/proxy';
@@ -29,6 +30,8 @@ if (started) {
       installSecurityPolicies();
 
       const settings = await loadSettings();
+
+      applyThemePreference(settings.appearance.theme);
 
       try {
         await cleanupOrphanSitePartitions(settings.connections.sites);

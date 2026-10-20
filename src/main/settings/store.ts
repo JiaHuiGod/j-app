@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import { access, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { app } from 'electron';
+import type { ThemePreference } from '@shared/appearance';
 import type { SiteConnection } from '@shared/connections';
 import type { AppSettings, ProxySettings } from '@shared/settings';
 import { createDefaultAppSettings } from './defaults';
@@ -163,6 +164,20 @@ export async function saveProxySettings(
   }));
 
   return proxy;
+}
+
+export async function saveThemePreference(
+  theme: ThemePreference,
+): Promise<ThemePreference> {
+  await updateSettings((current) => ({
+    ...current,
+    appearance: {
+      ...current.appearance,
+      theme,
+    },
+  }));
+
+  return theme;
 }
 
 export async function getSiteConnections(): Promise<readonly SiteConnection[]> {

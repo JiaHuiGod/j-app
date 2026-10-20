@@ -3,6 +3,7 @@ import type { SiteConnectionSummary } from '@shared/connections';
 import { AddSiteDialog } from '../components/AddSiteDialog';
 import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { GlobeIcon } from '../components/GlobeIcon';
+import { ThemeSettings } from '../components/ThemeSettings';
 import { toErrorMessage } from '../lib/errors';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
@@ -167,11 +168,11 @@ export function SettingsPage() {
     <main className="settings-page" aria-labelledby="settings-page-title">
       <header className="settings-page-header">
         <div className="settings-page-heading">
-          <p className="eyebrow">Preferences / Connections</p>
-          <h1 id="settings-page-title">账号与连接。</h1>
+          <p className="eyebrow">Preferences / Appearance & Connections</p>
+          <h1 id="settings-page-title">设置。</h1>
           <p className="lede">
-            管理需要登录的站点。每个站点使用独立的持久会话保存 Cookie，
-            登录信息不会进入页面或配置文件。
+            调整应用外观，并管理需要登录的站点。每个站点使用独立的持久会话保存
+            Cookie，登录信息不会进入页面或配置文件。
           </p>
         </div>
 
@@ -186,21 +187,7 @@ export function SettingsPage() {
         </aside>
       </header>
 
-      <aside
-        aria-label="站点资源占用提示"
-        className="connections-resource-warning"
-      >
-        <span className="connections-resource-warning-icon" aria-hidden="true">
-          !
-        </span>
-        <div>
-          <strong>站点越多，资源占用越高</strong>
-          <p>
-            每个站点都会增加独立的 Cookie、缓存和持久会话开销，而 Electron
-            本身有较高的内存占用。请只添加确实需要的站点，并在不再使用时及时移除。
-          </p>
-        </div>
-      </aside>
+      <ThemeSettings />
 
       <section aria-labelledby="connections-title" className="connections-card">
         <header className="connections-card-header">
@@ -222,6 +209,25 @@ export function SettingsPage() {
             添加站点
           </button>
         </header>
+
+        <aside
+          aria-label="站点资源占用提示"
+          className="connections-resource-warning"
+        >
+          <span
+            className="connections-resource-warning-icon"
+            aria-hidden="true"
+          >
+            !
+          </span>
+          <div>
+            <strong>站点越多，资源占用越高</strong>
+            <p>
+              每个站点都会增加独立的 Cookie、缓存和持久会话开销，而 Electron
+              本身有较高的内存占用。请只添加确实需要的站点，并在不再使用时及时移除。
+            </p>
+          </div>
+        </aside>
 
         {error && (
           <div className="connections-error" role="alert">
@@ -392,9 +398,7 @@ export function SettingsPage() {
         )}
       </section>
 
-      <p className="settings-page-note">
-        通用、外观与存储设置将在后续版本加入。
-      </p>
+      <p className="settings-page-note">通用与存储设置将在后续版本加入。</p>
 
       {isAddOpen && (
         <AddSiteDialog

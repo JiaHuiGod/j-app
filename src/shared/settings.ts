@@ -1,3 +1,4 @@
+import type { ThemePreference } from './appearance';
 import type { SiteConnection } from './connections';
 
 export const PROXY_PROTOCOLS = ['http', 'https', 'socks5'] as const;
@@ -12,12 +13,15 @@ export interface ProxySettings {
 }
 
 export interface AppSettings {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly network: {
     readonly proxy: ProxySettings;
   };
   readonly connections: {
     readonly sites: readonly SiteConnection[];
+  };
+  readonly appearance: {
+    readonly theme: ThemePreference;
   };
 }
 

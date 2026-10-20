@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { ThemePreference } from '@shared/appearance';
 import type { CreateSiteConnectionInput } from '@shared/connections';
 import {
   IpcChannel,
+  type AppearanceApi,
   type ConnectionsApi,
   type DesktopApi,
   type SettingsApi,
@@ -59,11 +61,19 @@ const connections = Object.freeze<ConnectionsApi>({
   },
 });
 
+const appearance = Object.freeze<AppearanceApi>({
+  get: () => ipcRenderer.invoke(IpcChannel.GetAppearance),
+  setTheme: (theme: ThemePreference) => {
+    return ipcRenderer.invoke(IpcChannel.SetAppearanceTheme, theme);
+  },
+});
+
 const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
   windowControls,
   settings,
+  appearance,
   connections,
   restartApp: () => {
     ipcRenderer.send(IpcChannel.RestartApp);
