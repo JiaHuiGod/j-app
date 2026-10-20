@@ -67,6 +67,8 @@ pnpm precommit
 j-app/
 ├─ docs/
 │  ├─ preview.png               # 主界面截图
+│  ├─ drive-page.png            # 网盘占位页
+│  ├─ settings-page.png         # 设置占位页
 │  ├─ proxy-dialog.png          # 网络代理弹窗
 │  ├─ proxy-saved.png           # 开启代理后的重启提示
 │  └─ proxy-saved-off.png       # 关闭代理后的重启提示
@@ -104,10 +106,15 @@ j-app/
 │  │  │  └─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
 │  │  ├─ hooks/
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
+│  │  ├─ pages/
+│  │  │  ├─ OverviewPage.tsx     # 概览页
+│  │  │  ├─ DrivePage.tsx        # 网盘占位页
+│  │  │  └─ SettingsPage.tsx     # 设置占位页
 │  │  ├─ styles/
 │  │  │  └─ global.css
 │  │  ├─ App.test.tsx           # 渲染层测试
-│  │  ├─ App.tsx
+│  │  ├─ App.tsx                # 页面切换与全局状态
+│  │  ├─ navigation.ts          # 主导航配置
 │  │  └─ main.tsx               # React 入口
 │  ├─ shared/                   # 三端共享的纯类型与契约
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
@@ -149,11 +156,39 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 布局和大致的扩展位置在 [`src/renderer/components/TitleBar.tsx`](src/renderer/components/TitleBar.tsx)：
 
-- `titlebar-nav`：主导航区域，将来增加页面入口时添加 `button.titlebar-nav-item`；
+- `titlebar-nav`：数据驱动的主导航，当前包含“概览 / 网盘 / 设置”；
 - `titlebar-actions`：全局工具按钮区域，目前包含“网络代理”入口，也可继续添加搜索、通知等操作；
 - 中间留白同时作为拖拽窗口的区域。
 
 窗口控制通过 `window.desktop.windowControls` 暴露，渲染层拿不到原始 `ipcRenderer`。主进程根据 IPC 发送者定位窗口，并在最大化状态变化时广播事件，按钮图标会随之切换。开发模式启动时会自动在独立窗口打开 DevTools，也可以使用 `F12` 或 `Ctrl/Cmd + Shift + I` 手动切换；生产构建不会自动打开。
+
+## 主导航与页面
+
+主导航目前提供三个页面：
+
+- **概览**：现有工程自检与运行环境
+- **网盘**：已接入导航的占位页，用于后续文件浏览和传输功能
+- **设置**：已接入导航的占位页，网络代理仍保持从标题栏独立打开
+
+导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换时会回到内容顶部，并使用 `aria-current` 标记当前页面。
+
+网盘页面：
+
+![网盘占位页](docs/drive-page.png)
+
+设置页面：
+
+![设置占位页](docs/settings-page.png)
+
+页面复用当前概览的视觉 Token 与 `.content` 栅格，在窗口宽度低于 980px 时自动切换为单列。已验证在 900×620 的最小窗口尺寸下没有横向溢出。
+
+新增页面时：
+
+1. 在 `navigation.ts` 中加入新的导航项；
+2. 在 `src/renderer/pages/` 中创建页面组件；
+3. 在 `App.tsx` 中注册页面渲染分支。
+
+当页面需要浏览器历史、深链或返回/前进能力时，再引入 React Router（Electron 下使用 `HashRouter`），当前阶段不提前增加依赖。
 
 ## 集中配置与网络代理
 

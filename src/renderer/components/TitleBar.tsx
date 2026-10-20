@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react';
+import { NAVIGATION_ITEMS, type AppPage } from '../navigation';
 import { AppMark } from './AppMark';
 import { GlobeIcon } from './GlobeIcon';
 
 interface TitleBarProps {
+  activePage: AppPage;
   proxyEnabled: boolean;
+  onNavigate: (page: AppPage) => void;
   onOpenProxySettings: () => void;
 }
 
-export function TitleBar({ proxyEnabled, onOpenProxySettings }: TitleBarProps) {
+export function TitleBar({
+  activePage,
+  proxyEnabled,
+  onNavigate,
+  onOpenProxySettings,
+}: TitleBarProps) {
   const { platform, windowControls } = window.desktop;
   const isMac = platform === 'darwin';
   const [isMaximized, setIsMaximized] = useState(false);
@@ -46,13 +54,23 @@ export function TitleBar({ proxyEnabled, onOpenProxySettings }: TitleBarProps) {
       <span className="titlebar-divider" aria-hidden="true" />
 
       <nav className="titlebar-nav" aria-label="主导航">
-        <span
-          aria-current="page"
-          className="titlebar-nav-item titlebar-nav-item--active"
-        >
-          概览
-        </span>
-        {/* Add future navigation entries here. */}
+        {NAVIGATION_ITEMS.map((item) => {
+          const isActive = item.id === activePage;
+
+          return (
+            <button
+              aria-current={isActive ? 'page' : undefined}
+              className={`titlebar-nav-item${isActive ? ' titlebar-nav-item--active' : ''}`}
+              key={item.id}
+              type="button"
+              onClick={() => {
+                onNavigate(item.id);
+              }}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="titlebar-drag-space" aria-hidden="true" />

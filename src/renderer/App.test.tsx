@@ -120,4 +120,33 @@ describe('App', () => {
 
     expect(restartApp).toHaveBeenCalledOnce();
   });
+
+  it('navigates between overview, drive, and settings pages', async () => {
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    const driveButton = screen.getByRole('button', { name: '网盘' });
+    fireEvent.click(driveButton);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: /把文件/ }),
+    ).toBeDefined();
+    expect(screen.getByText('网盘工作区正在搭建')).toBeDefined();
+    expect(driveButton.getAttribute('aria-current')).toBe('page');
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: /让应用/ }),
+    ).toBeDefined();
+    expect(screen.getByText('设置中心正在搭建')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: '概览' }));
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: /构建可靠的桌面应用/ }),
+    ).toBeDefined();
+  });
 });
