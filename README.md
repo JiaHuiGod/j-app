@@ -13,6 +13,7 @@
 - **Vite 8** — 主进程、预加载与渲染层构建，渲染层支持 HMR
 - **React 19 + TypeScript 6** — 严格类型的界面开发
 - **Vitest + Testing Library** — 渲染层单元测试
+- **Zod** — 集中配置的结构校验
 - **Oxlint + Oxfmt** — 静态检查与代码格式化
 - **pnpm** — 依赖管理
 
@@ -64,6 +65,11 @@ pnpm precommit
 
 ```text
 j-app/
+├─ docs/
+│  ├─ preview.png               # 主界面截图
+│  ├─ proxy-dialog.png          # 网络代理弹窗
+│  ├─ proxy-saved.png           # 开启代理后的重启提示
+│  └─ proxy-saved-off.png       # 关闭代理后的重启提示
 ├─ public/
 │  └─ favicon.svg               # 网页 favicon，也是应用图标的唯一源文件
 ├─ resources/
@@ -77,6 +83,13 @@ j-app/
 ├─ .lintstagedrc.json           # 暂存文件的 Oxlint/Oxfmt 自动修复规则
 ├─ src/
 │  ├─ main/                     # 主进程：拥有系统权限
+│  │  ├─ network/
+│  │  │  └─ proxy.ts            # 启动时应用代理、代理连接测试
+│  │  ├─ settings/
+│  │  │  ├─ defaults.ts         # 默认配置
+│  │  │  ├─ schema.ts           # Zod 配置校验
+│  │  │  ├─ schema.test.ts      # 配置校验测试
+│  │  │  └─ store.ts            # 单文件配置仓库、原子写入与坏文件恢复
 │  │  ├─ index.ts               # 应用生命周期、单实例、启动流程
 │  │  ├─ ipc.ts                 # ipcMain 处理器
 │  │  ├─ security.ts            # CSP 与 webview 防护
@@ -86,6 +99,8 @@ j-app/
 │  ├─ renderer/                 # 渲染进程：只负责 UI
 │  │  ├─ components/
 │  │  │  ├─ AppMark.tsx          # 与桌面图标一致的内联 SVG 标志
+│  │  │  ├─ GlobeIcon.tsx        # 网络代理图标
+│  │  │  ├─ ProxyDialog.tsx      # 代理配置、测试与重启提示弹窗
 │  │  │  └─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
 │  │  ├─ hooks/
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
@@ -96,6 +111,7 @@ j-app/
 │  │  └─ main.tsx               # React 入口
 │  ├─ shared/                   # 三端共享的纯类型与契约
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
+│  │  ├─ settings.ts            # 应用设置与代理数据类型
 │  │  └─ window.d.ts            # window.desktop 的全局类型
 │  └─ types/
 │     └─ electron-forge.d.ts    # Forge Vite 注入变量的类型
@@ -134,10 +150,70 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 布局和大致的扩展位置在 [`src/renderer/components/TitleBar.tsx`](src/renderer/components/TitleBar.tsx)：
 
 - `titlebar-nav`：主导航区域，将来增加页面入口时添加 `button.titlebar-nav-item`；
-- `titlebar-actions`：全局工具按钮区域，例如搜索、通知或设置；
+- `titlebar-actions`：全局工具按钮区域，目前包含“网络代理”入口，也可继续添加搜索、通知等操作；
 - 中间留白同时作为拖拽窗口的区域。
 
 窗口控制通过 `window.desktop.windowControls` 暴露，渲染层拿不到原始 `ipcRenderer`。主进程根据 IPC 发送者定位窗口，并在最大化状态变化时广播事件，按钮图标会随之切换。开发模式启动时会自动在独立窗口打开 DevTools，也可以使用 `F12` 或 `Ctrl/Cmd + Shift + I` 手动切换；生产构建不会自动打开。
+
+## 集中配置与网络代理
+
+### 配置存储
+
+所有运行时配置集中保存在一个文件中：
+
+```text
+app.getPath('userData')/settings.json
+```
+
+在 Windows 下即 `%APPDATA%\J App\settings.json`。当前结构：
+
+```json
+{
+  "schemaVersion": 1,
+  "network": {
+    "proxy": {
+      "enabled": true,
+      "protocol": "http",
+      "host": "127.0.0.1",
+      "port": 7890
+    }
+  }
+}
+```
+
+这是有意设计成“一个中心配置仓库”，而不是每个功能各自写一个文件或使用 `localStorage`：
+
+- **只有主进程读写文件**。渲染层通过 `window.desktop.settings` 的窄接口访问，避免多处写入、路径漂移和权限问题。
+- **结构集中在 `src/shared/settings.ts`**。新增设置时增加 section（如 `appearance`、`editor`），配置文件仍是同一个。
+- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。
+- **原子写入**。先写同目录临时文件、同步落盘，再 rename 到目标文件，避免中途退出留下半截 JSON。
+- **不用 `.env`**。`.env` 是构建时配置，不是用户运行时状态；也不应把用户代理写进仓库。
+- **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力可以由标题栏等上下文入口打开独立弹窗。
+
+后续新增配置时，在 `AppSettings`、Zod schema、默认值和对应的 IPC 方法中扩展同一个结构。若修改已有字段的语义，需要提升 `schemaVersion` 并在 store 中加入迁移逻辑。当前版本不保存密码等敏感信息；如果需要代理认证，密码应使用 Electron `safeStorage` 单独加密，不能以明文写入 `settings.json`。
+
+### 网络代理
+
+标题栏右侧的“代理”按钮会打开独立弹窗，不进入设置页面。按钮使用状态点颜色表示当前状态：绿色为已开启，灰色为未开启。
+
+![网络代理设置](docs/proxy-dialog.png)
+
+- 支持 HTTP、HTTPS 和 SOCKS5，自定义主机与端口；
+- 关闭自定义代理时使用系统代理设置；
+- `localhost`、`127.0.0.1`、`::1` 等本地地址始终直连；
+- 连接测试通过独立的内存 Session 访问 Google 和 GitHub，不修改当前窗口的网络状态，超时为 8 秒；
+- 保存后提示配置已写入，并要求重启应用生效；保存成功页会明确区分“已开启”和“已关闭”；
+- 可以选择“立即重启”（`app.relaunch()`）或稍后手动重启。
+
+![保存代理后的重启提示](docs/proxy-saved.png)
+
+关闭自定义代理时，保存结果会明确显示为“已关闭”，并说明重启后会恢复系统代理：
+
+![关闭代理后的重启提示](docs/proxy-saved-off.png)
+
+应用启动时会先读取 `settings.json`，在创建窗口前通过 `session.defaultSession.setProxy()` 应用代理，并关闭旧连接池，避免复用之前的代理连接。
+
+当前首版不支持需要账号密码的代理，也不开放自定义 bypass 列表；基础能力位于 [`src/main/network/proxy.ts`](src/main/network/proxy.ts)。
 
 ## 进程边界
 
@@ -153,7 +229,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 contextBridge.exposeInMainWorld('desktop', Object.freeze(desktopApi));
 ```
 
-类型来自 `src/shared/ipc.ts` 中的 `DesktopApi`，渲染层通过 `window.desktop` 获得完整补全。
+类型来自 `src/shared/ipc.ts` 中的 `DesktopApi`，渲染层通过 `window.desktop` 获得完整补全。网络代理同样通过 `window.desktop.settings` 的 `getProxy`、`saveProxy`、`testProxy` 三个窄接口访问，不暴露文件路径或任意读写能力。
 
 ### Renderer
 
@@ -203,6 +279,7 @@ const desktopApi: DesktopApi = {
 - 新窗口请求一律拒绝，只有 `https:` 链接会交给系统浏览器；
 - 阻止跨应用导航，拒绝页面挂载 `<webview>`；
 - 窗口控制走受限的 `window.desktop.windowControls` IPC，不向渲染层暴露 `ipcRenderer`；
+- 用户配置由主进程校验和原子写入，损坏文件会先备份；代理测试使用隔离 Session；
 - 开启 Electron Forge Fuses，包括 ASAR 完整性校验、禁用 `RunAsNode` 等；
 - 打包时启用 ASAR。
 

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+import { ProxyDialog } from './components/ProxyDialog';
 import { TitleBar } from './components/TitleBar';
 import { useAppInfo } from './hooks/useAppInfo';
+import type { ProxySettings } from '@shared/settings';
 
 const architectureLayers = [
   {
@@ -31,10 +34,40 @@ function formatPlatform(platform: string): string {
 
 function App() {
   const { state, retry } = useAppInfo();
+  const [isProxyDialogOpen, setIsProxyDialogOpen] = useState(false);
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    void window.desktop.settings
+      .getProxy()
+      .then((proxy) => {
+        if (isCurrent) {
+          setProxyEnabled(proxy.enabled);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to read proxy status:', error);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const handleProxySaved = (proxy: ProxySettings) => {
+    setProxyEnabled(proxy.enabled);
+  };
 
   return (
     <div className="app-window">
-      <TitleBar />
+      <TitleBar
+        onOpenProxySettings={() => {
+          setIsProxyDialogOpen(true);
+        }}
+        proxyEnabled={proxyEnabled}
+      />
 
       <div className="app-shell">
         <main className="content">
@@ -163,6 +196,15 @@ function App() {
           </span>
         </footer>
       </div>
+
+      {isProxyDialogOpen && (
+        <ProxyDialog
+          onClose={() => {
+            setIsProxyDialogOpen(false);
+          }}
+          onSaved={handleProxySaved}
+        />
+      )}
     </div>
   );
 }

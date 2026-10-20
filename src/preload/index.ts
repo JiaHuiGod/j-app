@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import { IpcChannel, type DesktopApi, type WindowControls } from '@shared/ipc';
+import {
+  IpcChannel,
+  type DesktopApi,
+  type SettingsApi,
+  type WindowControls,
+} from '@shared/ipc';
+import type { ProxySettings } from '@shared/settings';
 
 const windowControls = Object.freeze<WindowControls>({
   minimize: () => {
@@ -25,10 +31,24 @@ const windowControls = Object.freeze<WindowControls>({
   },
 });
 
+const settings = Object.freeze<SettingsApi>({
+  getProxy: () => ipcRenderer.invoke(IpcChannel.GetProxySettings),
+  saveProxy: (proxy: ProxySettings) => {
+    return ipcRenderer.invoke(IpcChannel.SaveProxySettings, proxy);
+  },
+  testProxy: (proxy: ProxySettings) => {
+    return ipcRenderer.invoke(IpcChannel.TestProxySettings, proxy);
+  },
+});
+
 const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
   windowControls,
+  settings,
+  restartApp: () => {
+    ipcRenderer.send(IpcChannel.RestartApp);
+  },
 });
 
 // Expose a narrow, typed API instead of the raw ipcRenderer object.

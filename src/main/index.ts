@@ -1,7 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc';
+import { applyProxySettings } from './network/proxy';
 import { installSecurityPolicies } from './security';
+import { loadSettings } from './settings/store';
 import { createMainWindow, focusMainWindow } from './window';
 
 if (started) {
@@ -18,12 +20,21 @@ if (started) {
 
   void app
     .whenReady()
-    .then(() => {
+    .then(async () => {
       if (process.platform === 'win32') {
         app.setAppUserModelId('com.japp.desktop');
       }
 
       installSecurityPolicies();
+
+      const settings = await loadSettings();
+
+      try {
+        await applyProxySettings(settings.network.proxy);
+      } catch (error) {
+        console.error('Failed to apply proxy settings:', error);
+      }
+
       registerIpcHandlers();
       createMainWindow();
 

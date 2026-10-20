@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { IpcChannel, type AppInfo } from '@shared/ipc';
+import { testProxySettings } from './network/proxy';
+import { getProxySettings, saveProxySettings } from './settings/store';
 
 function getAppInfo(): AppInfo {
   return {
@@ -23,6 +25,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannel.WindowIsMaximized, (event) => {
     return getSenderWindow(event.sender)?.isMaximized() ?? false;
   });
+  ipcMain.handle(IpcChannel.GetProxySettings, () => getProxySettings());
+  ipcMain.handle(
+    IpcChannel.SaveProxySettings,
+    async (_event, settings: unknown) => {
+      await saveProxySettings(settings);
+    },
+  );
+  ipcMain.handle(IpcChannel.TestProxySettings, (_event, settings: unknown) =>
+    testProxySettings(settings),
+  );
 
   ipcMain.on(IpcChannel.WindowMinimize, (event) => {
     getSenderWindow(event.sender)?.minimize();
@@ -44,5 +56,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.on(IpcChannel.WindowClose, (event) => {
     getSenderWindow(event.sender)?.close();
+  });
+
+  ipcMain.on(IpcChannel.RestartApp, () => {
+    app.relaunch();
+    app.exit(0);
   });
 }

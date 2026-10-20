@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AppMark } from './AppMark';
+import { GlobeIcon } from './GlobeIcon';
 
-export function TitleBar() {
+interface TitleBarProps {
+  proxyEnabled: boolean;
+  onOpenProxySettings: () => void;
+}
+
+export function TitleBar({ proxyEnabled, onOpenProxySettings }: TitleBarProps) {
   const { platform, windowControls } = window.desktop;
   const isMac = platform === 'darwin';
   const [isMaximized, setIsMaximized] = useState(false);
@@ -52,6 +58,17 @@ export function TitleBar() {
       <div className="titlebar-drag-space" aria-hidden="true" />
 
       <div className="titlebar-actions">
+        <button
+          aria-label={`网络代理，当前${proxyEnabled ? '已开启' : '未开启'}`}
+          className={`titlebar-action${proxyEnabled ? ' is-enabled' : ''}`}
+          title={`网络代理：${proxyEnabled ? '已开启' : '未开启'}`}
+          type="button"
+          onClick={onOpenProxySettings}
+        >
+          <GlobeIcon className="titlebar-action-icon" />
+          <span>代理</span>
+          <span className="titlebar-action-dot" aria-hidden="true" />
+        </button>
         {/* Add global toolbar actions here. */}
       </div>
 
