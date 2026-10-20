@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
+import { cleanupOrphanSitePartitions } from './connections/partition-cleanup';
 import { registerIpcHandlers } from './ipc';
 import { applyProxySettings } from './network/proxy';
 import { installSecurityPolicies } from './security';
@@ -28,6 +29,12 @@ if (started) {
       installSecurityPolicies();
 
       const settings = await loadSettings();
+
+      try {
+        await cleanupOrphanSitePartitions(settings.connections.sites);
+      } catch (error) {
+        console.error('Failed to clean up orphan site partitions:', error);
+      }
 
       try {
         await applyProxySettings(settings.network.proxy);

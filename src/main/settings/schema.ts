@@ -1,9 +1,46 @@
 import { z } from 'zod';
+import type {
+  CreateSiteConnectionInput,
+  SiteConnection,
+} from '@shared/connections';
 import {
   PROXY_PROTOCOLS,
   type AppSettings,
   type ProxySettings,
 } from '@shared/settings';
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+export function isAllowedLoginUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    if (url.protocol === 'https:') {
+      return !url.username && !url.password;
+    }
+
+    return (
+      url.protocol === 'http:' &&
+      LOOPBACK_HOSTS.has(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLoginUrl(value: string): string {
+  const trimmed = value.trim();
+
+  if (!isAllowedLoginUrl(trimmed)) {
+    throw new Error(
+      '登录地址必须是以 https:// 开头的有效地址，本地开发地址可以使用 http://localhost。',
+    );
+  }
+
+  return new URL(trimmed).toString();
+}
 
 const proxySettingsSchema = z
   .object({
@@ -40,32 +77,130 @@ const proxySettingsSchema = z
     }
   });
 
-export const appSettingsSchema = z.object({
+const siteConnectionSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(80),
+  loginUrl: z.string().refine(isAllowedLoginUrl, {
+    message: '站点登录地址必须是有效的 HTTPS 地址。',
+  }),
+  createdAt: z.string(),
+  lastLoginAt: z.string().nullable(),
+});
+
+const connectionsSchema = z
+  .object({
+    sites: z.array(siteConnectionSchema),
+  })
+  .superRefine(({ sites }, context) => {
+    const ids = new Set<string>();
+
+    for (const site of sites) {
+      if (ids.has(site.id)) {
+        context.addIssue({
+          code: 'custom',
+          message: '站点连接 ID 重复。',
+        });
+        return;
+      }
+
+      ids.add(site.id);
+    }
+  });
+
+const legacyAppSettingsSchema = z.object({
   schemaVersion: z.literal(1),
   network: z.object({
     proxy: proxySettingsSchema,
   }),
 });
 
+const appSettingsSchema = z.object({
+  schemaVersion: z.literal(2),
+  network: z.object({
+    proxy: proxySettingsSchema,
+  }),
+  connections: connectionsSchema,
+});
+
+const createSiteConnectionInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  loginUrl: z.string().trim().min(1),
+});
+
+const siteConnectionIdSchema = z.string().uuid();
+
+function formatSchemaError(error: z.ZodError): string {
+  return (
+    error.issues.map((issue) => issue.message).join('; ') || '配置格式不正确。'
+  );
+}
+
 export function parseProxySettings(input: unknown): ProxySettings {
   const result = proxySettingsSchema.safeParse(input);
 
   if (!result.success) {
-    throw new Error(result.error.issues[0]?.message ?? '代理配置格式不正确。');
+    throw new Error(formatSchemaError(result.error));
   }
 
   return result.data;
 }
 
 export function parseAppSettings(input: unknown): AppSettings {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'schemaVersion' in input &&
+    input.schemaVersion === 1
+  ) {
+    const legacyResult = legacyAppSettingsSchema.safeParse(input);
+
+    if (!legacyResult.success) {
+      throw new Error(formatSchemaError(legacyResult.error));
+    }
+
+    return {
+      schemaVersion: 2,
+      network: legacyResult.data.network,
+      connections: {
+        sites: [],
+      },
+    };
+  }
+
   const result = appSettingsSchema.safeParse(input);
 
   if (!result.success) {
-    throw new Error(
-      result.error.issues.map((issue) => issue.message).join('; ') ||
-        '应用配置格式不正确。',
-    );
+    throw new Error(formatSchemaError(result.error));
   }
 
   return result.data;
+}
+
+export function parseCreateSiteConnectionInput(
+  input: unknown,
+): CreateSiteConnectionInput {
+  const result = createSiteConnectionInputSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new Error(formatSchemaError(result.error));
+  }
+
+  return {
+    name: result.data.name,
+    loginUrl: normalizeLoginUrl(result.data.loginUrl),
+  };
+}
+
+export function parseSiteConnectionId(input: unknown): string {
+  const result = siteConnectionIdSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new Error('站点连接 ID 格式不正确。');
+  }
+
+  return result.data;
+}
+
+export function isSiteConnection(value: unknown): value is SiteConnection {
+  return siteConnectionSchema.safeParse(value).success;
 }

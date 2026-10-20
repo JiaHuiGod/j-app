@@ -1,5 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { IpcChannel, type AppInfo } from '@shared/ipc';
+import {
+  clearAllSiteConnectionData,
+  createSiteConnection,
+  listSiteConnections,
+  loginSiteConnection,
+  removeSiteConnectionData,
+} from './connections/session-manager';
 import { testProxySettings } from './network/proxy';
 import { getProxySettings, saveProxySettings } from './settings/store';
 
@@ -34,6 +41,23 @@ export function registerIpcHandlers(): void {
   );
   ipcMain.handle(IpcChannel.TestProxySettings, (_event, settings: unknown) =>
     testProxySettings(settings),
+  );
+  ipcMain.handle(IpcChannel.ListSiteConnections, () => listSiteConnections());
+  ipcMain.handle(IpcChannel.CreateSiteConnection, (_event, input: unknown) =>
+    createSiteConnection(input),
+  );
+  ipcMain.handle(
+    IpcChannel.LoginSiteConnection,
+    (_event, connectionId: unknown) => loginSiteConnection(connectionId),
+  );
+  ipcMain.handle(
+    IpcChannel.RemoveSiteConnection,
+    async (_event, connectionId: unknown) => {
+      await removeSiteConnectionData(connectionId);
+    },
+  );
+  ipcMain.handle(IpcChannel.ClearSiteConnections, () =>
+    clearAllSiteConnectionData(),
   );
 
   ipcMain.on(IpcChannel.WindowMinimize, (event) => {

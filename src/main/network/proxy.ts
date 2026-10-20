@@ -47,10 +47,17 @@ export function createProxyConfig(proxy: ProxySettings): ProxyConfig {
   };
 }
 
-export async function applyProxySettings(proxy: ProxySettings): Promise<void> {
-  await session.defaultSession.setProxy(createProxyConfig(proxy));
+export async function applyProxyToSession(
+  targetSession: Session,
+  proxy: ProxySettings,
+): Promise<void> {
+  await targetSession.setProxy(createProxyConfig(proxy));
   // Prevent pooled sockets from using the proxy configuration from before.
-  await session.defaultSession.closeAllConnections();
+  await targetSession.closeAllConnections();
+}
+
+export async function applyProxySettings(proxy: ProxySettings): Promise<void> {
+  await applyProxyToSession(session.defaultSession, proxy);
 }
 
 function getTestSession(): Session {

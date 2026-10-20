@@ -1,3 +1,5 @@
+import type { SiteConnection } from './connections';
+
 export const PROXY_PROTOCOLS = ['http', 'https', 'socks5'] as const;
 
 export type ProxyProtocol = (typeof PROXY_PROTOCOLS)[number];
@@ -10,9 +12,12 @@ export interface ProxySettings {
 }
 
 export interface AppSettings {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly network: {
     readonly proxy: ProxySettings;
+  };
+  readonly connections: {
+    readonly sites: readonly SiteConnection[];
   };
 }
 

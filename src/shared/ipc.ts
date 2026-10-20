@@ -1,3 +1,7 @@
+import type {
+  CreateSiteConnectionInput,
+  SiteConnectionSummary,
+} from './connections';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
 /**
@@ -15,6 +19,11 @@ export const IpcChannel = {
   SaveProxySettings: 'settings:save-proxy',
   TestProxySettings: 'settings:test-proxy',
   RestartApp: 'app:restart',
+  ListSiteConnections: 'connections:list',
+  CreateSiteConnection: 'connections:create',
+  LoginSiteConnection: 'connections:login',
+  RemoveSiteConnection: 'connections:remove',
+  ClearSiteConnections: 'connections:clear-all',
 } as const;
 
 export interface AppInfo {
@@ -42,6 +51,14 @@ export interface SettingsApi {
   testProxy: (settings: ProxySettings) => Promise<ProxyTestResult>;
 }
 
+export interface ConnectionsApi {
+  list: () => Promise<readonly SiteConnectionSummary[]>;
+  create: (input: CreateSiteConnectionInput) => Promise<SiteConnectionSummary>;
+  login: (connectionId: string) => Promise<SiteConnectionSummary>;
+  remove: (connectionId: string) => Promise<void>;
+  clearAll: () => Promise<number>;
+}
+
 /**
  * The only API exposed to the renderer through `window.desktop`.
  * Add methods here first, then implement them in the preload and main process.
@@ -51,5 +68,6 @@ export interface DesktopApi {
   readonly getAppInfo: () => Promise<AppInfo>;
   readonly windowControls: WindowControls;
   readonly settings: SettingsApi;
+  readonly connections: ConnectionsApi;
   readonly restartApp: () => void;
 }

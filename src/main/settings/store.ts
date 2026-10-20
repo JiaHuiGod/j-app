@@ -2,11 +2,17 @@ import { constants } from 'node:fs';
 import { access, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { app } from 'electron';
+import type { SiteConnection } from '@shared/connections';
 import type { AppSettings, ProxySettings } from '@shared/settings';
 import { createDefaultAppSettings } from './defaults';
 import { parseAppSettings, parseProxySettings } from './schema';
 
 const SETTINGS_FILE_NAME = 'settings.json';
+
+interface StoredSettings {
+  readonly settings: AppSettings;
+  readonly migrated: boolean;
+}
 
 let cachedSettings: AppSettings | null = null;
 let saveQueue: Promise<void> = Promise.resolve();
@@ -50,7 +56,7 @@ async function moveInvalidSettingsAside(): Promise<void> {
   console.warn(`Invalid settings moved to ${backupPath}`);
 }
 
-async function readSettingsFromDisk(): Promise<AppSettings | null> {
+async function readSettingsFromDisk(): Promise<StoredSettings | null> {
   const settingsPath = getSettingsPath();
 
   try {
@@ -67,7 +73,16 @@ async function readSettingsFromDisk(): Promise<AppSettings | null> {
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    return parseAppSettings(parsed);
+    const settings = parseAppSettings(parsed);
+    const storedVersion =
+      typeof parsed === 'object' && parsed !== null && 'schemaVersion' in parsed
+        ? parsed.schemaVersion
+        : null;
+
+    return {
+      settings,
+      migrated: storedVersion !== settings.schemaVersion,
+    };
   } catch (error) {
     console.error('Failed to parse settings:', error);
     await moveInvalidSettingsAside().catch((backupError: unknown) => {
@@ -83,11 +98,18 @@ export async function loadSettings(): Promise<AppSettings> {
   }
 
   try {
-    const storedSettings = await readSettingsFromDisk();
+    const stored = await readSettingsFromDisk();
 
-    if (storedSettings) {
-      cachedSettings = storedSettings;
-      return storedSettings;
+    if (stored) {
+      cachedSettings = stored.settings;
+
+      if (stored.migrated) {
+        await writeSettingsFile(stored.settings).catch((error: unknown) => {
+          console.error('Failed to persist migrated settings:', error);
+        });
+      }
+
+      return stored.settings;
     }
 
     cachedSettings = createDefaultAppSettings();
@@ -102,6 +124,27 @@ export async function loadSettings(): Promise<AppSettings> {
   }
 }
 
+async function updateSettings(
+  updater: (current: AppSettings) => AppSettings,
+): Promise<AppSettings> {
+  const operation = saveQueue.then(async () => {
+    const current = await loadSettings();
+    const next = parseAppSettings(updater(current));
+
+    await writeSettingsFile(next);
+    cachedSettings = next;
+
+    return next;
+  });
+
+  saveQueue = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return operation;
+}
+
 export async function getProxySettings(): Promise<ProxySettings> {
   return (await loadSettings()).network.proxy;
 }
@@ -111,22 +154,122 @@ export async function saveProxySettings(
 ): Promise<ProxySettings> {
   const proxy = parseProxySettings(input);
 
-  const operation = saveQueue.then(async () => {
-    const current = await loadSettings();
-    const next: AppSettings = {
-      ...current,
-      network: {
-        ...current.network,
-        proxy,
-      },
-    };
-
-    await writeSettingsFile(next);
-    cachedSettings = next;
-  });
-
-  saveQueue = operation.catch(() => undefined);
-  await operation;
+  await updateSettings((current) => ({
+    ...current,
+    network: {
+      ...current.network,
+      proxy,
+    },
+  }));
 
   return proxy;
+}
+
+export async function getSiteConnections(): Promise<readonly SiteConnection[]> {
+  return (await loadSettings()).connections.sites;
+}
+
+export async function findSiteConnection(
+  id: string,
+): Promise<SiteConnection | null> {
+  const settings = await loadSettings();
+  return (
+    settings.connections.sites.find((connection) => connection.id === id) ??
+    null
+  );
+}
+
+export async function addSiteConnection(
+  connection: SiteConnection,
+): Promise<SiteConnection> {
+  await updateSettings((current) => {
+    if (current.connections.sites.some((site) => site.id === connection.id)) {
+      throw new Error('站点连接已经存在。');
+    }
+
+    return {
+      ...current,
+      connections: {
+        sites: [...current.connections.sites, connection],
+      },
+    };
+  });
+
+  return connection;
+}
+
+export async function updateSiteConnectionLoginAt(
+  id: string,
+  lastLoginAt: string,
+): Promise<SiteConnection> {
+  let updatedConnection: SiteConnection | null = null;
+
+  await updateSettings((current) => ({
+    ...current,
+    connections: {
+      sites: current.connections.sites.map((connection) => {
+        if (connection.id !== id) {
+          return connection;
+        }
+
+        updatedConnection = {
+          ...connection,
+          lastLoginAt,
+        };
+
+        return updatedConnection;
+      }),
+    },
+  }));
+
+  if (!updatedConnection) {
+    throw new Error('站点连接不存在。');
+  }
+
+  return updatedConnection;
+}
+
+export async function removeSiteConnection(
+  id: string,
+): Promise<SiteConnection> {
+  let removedConnection: SiteConnection | null = null;
+
+  await updateSettings((current) => ({
+    ...current,
+    connections: {
+      sites: current.connections.sites.filter((connection) => {
+        if (connection.id !== id) {
+          return true;
+        }
+
+        removedConnection = connection;
+        return false;
+      }),
+    },
+  }));
+
+  if (!removedConnection) {
+    throw new Error('站点连接不存在。');
+  }
+
+  return removedConnection;
+}
+
+export async function removeAllSiteConnections(): Promise<
+  readonly SiteConnection[]
+> {
+  let removedConnections: readonly SiteConnection[] = [];
+
+  await updateSettings((current) => {
+    removedConnections = current.connections.sites;
+
+    return {
+      ...current,
+      connections: {
+        sites: [],
+      },
+    };
+  });
+
+  return removedConnections;
 }

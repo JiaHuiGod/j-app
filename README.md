@@ -2,7 +2,7 @@
 
 一个面向实际开发起步的 Electron 桌面应用工程：**Electron Forge + Vite + React 19 + TypeScript**。
 
-项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。初始页面会通过真实的 `contextBridge` 调用读取运行时信息，可作为端到端链路是否正常的自检。
+项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、网络代理、页面导航和按站点隔离的 Cookie 会话管理。
 
 ![J App 运行预览](docs/preview.png)
 
@@ -68,7 +68,10 @@ j-app/
 ├─ docs/
 │  ├─ preview.png               # 主界面截图
 │  ├─ drive-page.png            # 网盘占位页
-│  ├─ settings-page.png         # 设置占位页
+│  ├─ settings-page.png         # 账号与连接设置页
+│  ├─ cookie-dialog.png         # 添加站点登录弹窗
+│  ├─ clear-all-dialog.png      # 清理全部站点确认弹窗
+│  ├─ cookie-sessions.md        # 站点 Cookie 会话功能文档
 │  ├─ proxy-dialog.png          # 网络代理弹窗
 │  ├─ proxy-saved.png           # 开启代理后的重启提示
 │  └─ proxy-saved-off.png       # 关闭代理后的重启提示
@@ -85,11 +88,16 @@ j-app/
 ├─ .lintstagedrc.json           # 暂存文件的 Oxlint/Oxfmt 自动修复规则
 ├─ src/
 │  ├─ main/                     # 主进程：拥有系统权限
+│  │  ├─ connections/
+│  │  │  ├─ partition-cleanup.ts # 启动时清理无主站点分区
+│  │  │  ├─ partition.ts         # 分区命名与无主分区识别
+│  │  │  ├─ session-manager.ts   # 登录窗口、持久 Session 与 Cookie 生命周期
+│  │  │  └─ site-profile.ts      # 站点会话的桌面 Chrome UA 兼容配置
 │  │  ├─ network/
 │  │  │  └─ proxy.ts            # 启动时应用代理、代理连接测试
 │  │  ├─ settings/
 │  │  │  ├─ defaults.ts         # 默认配置
-│  │  │  ├─ schema.ts           # Zod 配置校验
+│  │  │  ├─ schema.ts           # Zod 配置校验与版本迁移
 │  │  │  ├─ schema.test.ts      # 配置校验测试
 │  │  │  └─ store.ts            # 单文件配置仓库、原子写入与坏文件恢复
 │  │  ├─ index.ts               # 应用生命周期、单实例、启动流程
@@ -100,16 +108,20 @@ j-app/
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
 │  │  ├─ components/
+│  │  │  ├─ AddSiteDialog.tsx    # 添加站点登录弹窗
 │  │  │  ├─ AppMark.tsx          # 与桌面图标一致的内联 SVG 标志
-│  │  │  ├─ GlobeIcon.tsx        # 网络代理图标
+│  │  │  ├─ ClearAllSitesDialog.tsx # 清理全部站点确认弹窗
+│  │  │  ├─ GlobeIcon.tsx        # 网络代理与站点图标
 │  │  │  ├─ ProxyDialog.tsx      # 代理配置、测试与重启提示弹窗
 │  │  │  └─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
 │  │  ├─ hooks/
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
+│  │  ├─ lib/
+│  │  │  └─ errors.ts           # IPC 错误消息整理
 │  │  ├─ pages/
 │  │  │  ├─ OverviewPage.tsx     # 概览页
 │  │  │  ├─ DrivePage.tsx        # 网盘占位页
-│  │  │  └─ SettingsPage.tsx     # 设置占位页
+│  │  │  └─ SettingsPage.tsx     # 账号、资源提示与数据清理
 │  │  ├─ styles/
 │  │  │  └─ global.css
 │  │  ├─ App.test.tsx           # 渲染层测试
@@ -117,6 +129,7 @@ j-app/
 │  │  ├─ navigation.ts          # 主导航配置
 │  │  └─ main.tsx               # React 入口
 │  ├─ shared/                   # 三端共享的纯类型与契约
+│  │  ├─ connections.ts         # 站点连接与 Cookie 摘要类型
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
 │  │  ├─ settings.ts            # 应用设置与代理数据类型
 │  │  └─ window.d.ts            # window.desktop 的全局类型
@@ -168,7 +181,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 - **概览**：现有工程自检与运行环境
 - **网盘**：已接入导航的占位页，用于后续文件浏览和传输功能
-- **设置**：已接入导航的占位页，网络代理仍保持从标题栏独立打开
+- **设置**：站点账号与 Cookie 会话管理，网络代理仍保持从标题栏独立打开
 
 导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换时会回到内容顶部，并使用 `aria-current` 标记当前页面。
 
@@ -178,9 +191,9 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 设置页面：
 
-![设置占位页](docs/settings-page.png)
+![账号与连接设置页](docs/settings-page.png)
 
-页面复用当前概览的视觉 Token 与 `.content` 栅格，在窗口宽度低于 980px 时自动切换为单列。已验证在 900×620 的最小窗口尺寸下没有横向溢出。
+页面复用当前视觉 Token；概览和网盘使用 `.content` 栅格，设置页使用 `.settings-page`。窗口宽度低于 980px 时自动切换为单列，已验证在 900×620 的最小窗口尺寸下没有横向溢出。
 
 新增页面时：
 
@@ -190,11 +203,34 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 当页面需要浏览器历史、深链或返回/前进能力时，再引入 React Router（Electron 下使用 `HashRouter`），当前阶段不提前增加依赖。
 
+## 站点 Cookie 会话
+
+设置页现在可以管理多个需要登录的站点：
+
+- 每个连接使用独立的 `persist:japp-site-<uuid>` Session，同一站点可保存多个账号；
+- 用户通过独立的登录窗口手动登录，关闭窗口后应用检测并保存 Cookie；
+- Cookie 由 Chromium 加密持久化，不进入 `settings.json`、React state 或 IPC 返回值；
+- 登录 Session 复用当前代理配置；
+- 站点会话使用标准桌面 Chrome UA 和 `Accept-Language`，避免普通网站把 Electron 默认 UA 当作不兼容客户端；
+- 保存前调用 `cookies.flushStore()`，重启应用后仍保持登录态；
+- 设置页会提示每个站点都会增加独立的内存、缓存和磁盘占用；
+- 支持移除单个站点，也支持带确认的“清理全部站点数据”；
+- 应用启动时会扫描并删除已没有连接元数据的无主站点 partition；
+- 移除连接会清理对应 Session 的 Cookie、缓存和本地存储。
+
+清理全部站点数据需要二次确认：
+
+![清理全部站点数据](docs/clear-all-dialog.png)
+
+站点访问兼容性需要明确边界：标准 Chrome UA 只解决 Electron 默认 UA 被普通网站误判的问题，**不处理 Cloudflare 挑战、CAPTCHA、地区限制或账号风控**。如果同一网络下普通浏览器正常而应用仍被拦截，应优先使用站点官方 API 或联系站点，不要通过伪造 clearance、轮换代理或反检测手段绕过访问控制。
+
+详细的数据模型、登录流程、安全边界、生命周期、清理策略、内部 API 和已知限制见 [站点 Cookie 会话文档](docs/cookie-sessions.md)。
+
 ## 集中配置与网络代理
 
 ### 配置存储
 
-所有运行时配置集中保存在一个文件中：
+所有非敏感运行时配置集中保存在一个文件中：
 
 ```text
 app.getPath('userData')/settings.json
@@ -204,7 +240,7 @@ app.getPath('userData')/settings.json
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "network": {
     "proxy": {
       "enabled": true,
@@ -212,20 +248,32 @@ app.getPath('userData')/settings.json
       "host": "127.0.0.1",
       "port": 7890
     }
+  },
+  "connections": {
+    "sites": [
+      {
+        "id": "0f2a63a7-0a9f-4b0a-9d0b-6b8e1c1a2f5d",
+        "name": "GitHub",
+        "loginUrl": "https://github.com/login",
+        "createdAt": "2026-10-21T02:00:00.000Z",
+        "lastLoginAt": "2026-10-21T02:10:00.000Z"
+      }
+    ]
   }
 }
 ```
 
 这是有意设计成“一个中心配置仓库”，而不是每个功能各自写一个文件或使用 `localStorage`：
 
-- **只有主进程读写文件**。渲染层通过 `window.desktop.settings` 的窄接口访问，避免多处写入、路径漂移和权限问题。
+- **只有主进程读写文件**。渲染层通过 `window.desktop` 的窄接口访问，避免多处写入、路径漂移和权限问题。
 - **结构集中在 `src/shared/settings.ts`**。新增设置时增加 section（如 `appearance`、`editor`），配置文件仍是同一个。
-- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。
+- **带 `schemaVersion` 并用 Zod 校验**。不符合当前结构的文件会被移到 `settings.invalid-<timestamp>.json` 备份，再恢复默认值，避免静默损坏。版本 1 配置会自动迁移到版本 2 并补充空的 `connections`。
 - **原子写入**。先写同目录临时文件、同步落盘，再 rename 到目标文件，避免中途退出留下半截 JSON。
 - **不用 `.env`**。`.env` 是构建时配置，不是用户运行时状态；也不应把用户代理写进仓库。
-- **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力可以由标题栏等上下文入口打开独立弹窗。
+- **配置与凭据分层**。站点 Cookie 属于登录凭据，不进入 `settings.json`，而是交给 Chromium 的加密持久分区。集中配置只保存站点 ID、名称、URL 和登录时间。
+- **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力由标题栏上下文入口打开独立弹窗；账号与连接则放在设置页集中管理。
 
-后续新增配置时，在 `AppSettings`、Zod schema、默认值和对应的 IPC 方法中扩展同一个结构。若修改已有字段的语义，需要提升 `schemaVersion` 并在 store 中加入迁移逻辑。当前版本不保存密码等敏感信息；如果需要代理认证，密码应使用 Electron `safeStorage` 单独加密，不能以明文写入 `settings.json`。
+后续新增配置时，在 `AppSettings`、Zod schema、默认值和对应的 IPC 方法中扩展同一个结构。若修改已有字段的语义，需要提升 `schemaVersion` 并在 store 中加入迁移逻辑。当前版本不保存账号密码；Cookie 由独立 Session 保存，不写入 JSON；如果将来需要代理认证，密码应使用 Electron `safeStorage` 单独加密。
 
 ### 网络代理
 
@@ -247,6 +295,8 @@ app.getPath('userData')/settings.json
 ![关闭代理后的重启提示](docs/proxy-saved-off.png)
 
 应用启动时会先读取 `settings.json`，在创建窗口前通过 `session.defaultSession.setProxy()` 应用代理，并关闭旧连接池，避免复用之前的代理连接。
+
+站点登录 Session 和未来抓取任务不会自动继承默认 Session 的代理配置。`session-manager.ts` 在打开登录窗口和返回站点 Session 前调用 `applyProxyToSession()`，保证主窗口、登录窗口和后台请求使用同一份代理设置。代理修改仍需重启应用后生效。
 
 当前首版不支持需要账号密码的代理，也不开放自定义 bypass 列表；基础能力位于 [`src/main/network/proxy.ts`](src/main/network/proxy.ts)。
 
@@ -311,9 +361,13 @@ const desktopApi: DesktopApi = {
 
 - `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webviewTag: false`；
 - 通过 `src/main/security.ts` 为页面注入按环境区分的 CSP；开发环境仅为 HMR 放开必要来源；
-- 新窗口请求一律拒绝，只有 `https:` 链接会交给系统浏览器；
+- 主应用窗口拒绝新窗口请求，只有 `https:` 链接会交给系统浏览器；
+- 站点登录窗口是受控例外：不使用应用 preload，不启用 Node，只允许 HTTPS（本地回环允许 HTTP），并继承同一个独立 Session；
 - 阻止跨应用导航，拒绝页面挂载 `<webview>`；
 - 窗口控制走受限的 `window.desktop.windowControls` IPC，不向渲染层暴露 `ipcRenderer`；
+- 站点连接按 UUID 使用独立持久 Session，Cookie 不进入配置、React state、URL、日志或 IPC 返回值；
+- 提供单站点移除和“清理全部站点数据”，启动时自动删除没有连接元数据的无主站点 partition；
+- 站点会话使用标准桌面 Chrome UA 和语言头，仅用于普通网站兼容；工程不实现 Cloudflare/CAPTCHA 绕过；
 - 用户配置由主进程校验和原子写入，损坏文件会先备份；代理测试使用隔离 Session；
 - 开启 Electron Forge Fuses，包括 ASAR 完整性校验、禁用 `RunAsNode` 等；
 - 打包时启用 ASAR。

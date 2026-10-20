@@ -11,6 +11,7 @@ import {
   type ProxySettings,
   type ProxyTestResult,
 } from '@shared/settings';
+import { toErrorMessage } from '../lib/errors';
 import { GlobeIcon } from './GlobeIcon';
 
 const PROTOCOL_LABELS: Record<ProxyProtocol, string> = {
@@ -36,21 +37,6 @@ interface ProxyDraft {
 interface ProxyDialogProps {
   onClose: () => void;
   onSaved: (proxy: ProxySettings) => void;
-}
-
-function toErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) {
-    const message = error.message.replace(
-      /^Error invoking remote method '[^']+': (?:Error: )?/,
-      '',
-    );
-
-    if (message) {
-      return message;
-    }
-  }
-
-  return fallback;
 }
 
 export function ProxyDialog({ onClose, onSaved }: ProxyDialogProps) {

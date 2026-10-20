@@ -174,3 +174,11 @@ export function focusMainWindow(): void {
   mainWindow.show();
   mainWindow.focus();
 }
+
+export function getMainWindow(): BrowserWindow | null {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return null;
+  }
+
+  return mainWindow;
+}

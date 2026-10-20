@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { CreateSiteConnectionInput } from '@shared/connections';
 import {
   IpcChannel,
+  type ConnectionsApi,
   type DesktopApi,
   type SettingsApi,
   type WindowControls,
@@ -41,11 +43,28 @@ const settings = Object.freeze<SettingsApi>({
   },
 });
 
+const connections = Object.freeze<ConnectionsApi>({
+  list: () => ipcRenderer.invoke(IpcChannel.ListSiteConnections),
+  create: (input: CreateSiteConnectionInput) => {
+    return ipcRenderer.invoke(IpcChannel.CreateSiteConnection, input);
+  },
+  login: (connectionId: string) => {
+    return ipcRenderer.invoke(IpcChannel.LoginSiteConnection, connectionId);
+  },
+  remove: (connectionId: string) => {
+    return ipcRenderer.invoke(IpcChannel.RemoveSiteConnection, connectionId);
+  },
+  clearAll: () => {
+    return ipcRenderer.invoke(IpcChannel.ClearSiteConnections);
+  },
+});
+
 const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
   windowControls,
   settings,
+  connections,
   restartApp: () => {
     ipcRenderer.send(IpcChannel.RestartApp);
   },

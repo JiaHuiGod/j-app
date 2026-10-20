@@ -1,21 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { parseAppSettings, parseProxySettings } from './schema';
+import {
+  parseAppSettings,
+  parseCreateSiteConnectionInput,
+  parseProxySettings,
+} from './schema';
+
+const disabledProxy = {
+  enabled: false,
+  protocol: 'http' as const,
+  host: '',
+  port: 0,
+};
 
 describe('proxy settings validation', () => {
   it('allows a disabled proxy without a host or port', () => {
-    expect(
-      parseProxySettings({
-        enabled: false,
-        protocol: 'http',
-        host: '',
-        port: 0,
-      }),
-    ).toEqual({
-      enabled: false,
-      protocol: 'http',
-      host: '',
-      port: 0,
-    });
+    expect(parseProxySettings(disabledProxy)).toEqual(disabledProxy);
   });
 
   it('normalizes a valid enabled proxy', () => {
@@ -44,20 +43,96 @@ describe('proxy settings validation', () => {
       }),
     ).toThrow('请输入代理主机地址。');
   });
+});
+
+describe('application settings migration', () => {
+  it('migrates version 1 settings and adds an empty connections section', () => {
+    const migrated = parseAppSettings({
+      schemaVersion: 1,
+      network: {
+        proxy: disabledProxy,
+      },
+    });
+
+    expect(migrated).toEqual({
+      schemaVersion: 2,
+      network: {
+        proxy: disabledProxy,
+      },
+      connections: {
+        sites: [],
+      },
+    });
+  });
+
+  it('accepts version 2 site connection metadata', () => {
+    const settings = parseAppSettings({
+      schemaVersion: 2,
+      network: {
+        proxy: disabledProxy,
+      },
+      connections: {
+        sites: [
+          {
+            id: '0f2a63a7-0a9f-4b0a-9d0b-6b8e1c1a2f5d',
+            name: 'GitHub',
+            loginUrl: 'https://github.com/login',
+            createdAt: '2026-10-21T02:00:00.000Z',
+            lastLoginAt: null,
+          },
+        ],
+      },
+    });
+
+    expect(settings.connections.sites).toHaveLength(1);
+  });
 
   it('rejects unsupported settings versions', () => {
     expect(() =>
       parseAppSettings({
-        schemaVersion: 2,
+        schemaVersion: 3,
         network: {
-          proxy: {
-            enabled: false,
-            protocol: 'http',
-            host: '',
-            port: 0,
-          },
+          proxy: disabledProxy,
+        },
+        connections: {
+          sites: [],
         },
       }),
     ).toThrow(/schemaVersion|Invalid input|expected/i);
+  });
+});
+
+describe('site connection input validation', () => {
+  it('normalizes an HTTPS login address', () => {
+    expect(
+      parseCreateSiteConnectionInput({
+        name: ' GitHub ',
+        loginUrl: ' https://github.com/login ',
+      }),
+    ).toEqual({
+      name: 'GitHub',
+      loginUrl: 'https://github.com/login',
+    });
+  });
+
+  it('allows a local development login address over HTTP', () => {
+    expect(
+      parseCreateSiteConnectionInput({
+        name: 'Local',
+        loginUrl: 'http://localhost:3000/login',
+      }),
+    ).toEqual({
+      name: 'Local',
+      loginUrl: 'http://localhost:3000/login',
+    });
+  });
+
+  it('rejects a non-local HTTP login address', () => {
+    expect(() =>
+      parseCreateSiteConnectionInput({
+        name: 'Example',
+        loginUrl: 'http://example.com/login',
+      }),
+    ).toThrow(/https/i);
   });
 });
