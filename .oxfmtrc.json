@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "printWidth": 80,
+  "endOfLine": "lf",
+  "sortPackageJson": false,
+  "ignorePatterns": ["pnpm-lock.yaml", "out/**", ".vite/**"]
+}

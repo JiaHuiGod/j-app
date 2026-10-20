@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output and caches
+.vite/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+.oxlintcache
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+*.local
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
