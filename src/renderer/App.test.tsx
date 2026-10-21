@@ -87,6 +87,7 @@ const driveRootListing: DriveListing = {
       modifiedAt: '2026-10-21T10:00:00.000Z',
       extension: null,
       durationSeconds: null,
+      pickcode: null,
     },
     {
       id: '20',
@@ -97,6 +98,7 @@ const driveRootListing: DriveListing = {
       modifiedAt: '2026-10-21T09:00:00.000Z',
       extension: 'txt',
       durationSeconds: null,
+      pickcode: null,
     },
   ],
   offset: 0,
@@ -122,6 +124,7 @@ const driveChildListing: DriveListing = {
       modifiedAt: '2026-10-21T11:00:00.000Z',
       extension: 'txt',
       durationSeconds: null,
+      pickcode: null,
     },
   ],
   offset: 0,
@@ -158,6 +161,13 @@ let uploadDroppedDriveFiles: ReturnType<
 >;
 let listOfflineTasks: ReturnType<typeof vi.fn<DriveApi['listOfflineTasks']>>;
 let addOfflineTasks: ReturnType<typeof vi.fn<DriveApi['addOfflineTasks']>>;
+let downloadDriveVideo: ReturnType<typeof vi.fn<DriveApi['downloadVideo']>>;
+let openDriveDownloadFolder: ReturnType<
+  typeof vi.fn<DriveApi['openDownloadFolder']>
+>;
+let onDriveVideoDownloadProgress: ReturnType<
+  typeof vi.fn<DriveApi['onVideoDownloadProgress']>
+>;
 let onDriveUploadProgress: ReturnType<
   typeof vi.fn<DriveApi['onUploadProgress']>
 >;
@@ -256,6 +266,21 @@ beforeEach(() => {
       errors: [],
     },
   });
+  downloadDriveVideo = vi.fn<DriveApi['downloadVideo']>().mockResolvedValue({
+    ok: true,
+    data: {
+      canceled: true,
+      fileName: 'movie.mp4',
+      filePath: null,
+      bytes: 0,
+    },
+  });
+  onDriveVideoDownloadProgress = vi
+    .fn<DriveApi['onVideoDownloadProgress']>()
+    .mockReturnValue(() => {});
+  openDriveDownloadFolder = vi
+    .fn<DriveApi['openDownloadFolder']>()
+    .mockResolvedValue({ ok: true, data: null });
   onDriveUploadProgress = vi
     .fn<DriveApi['onUploadProgress']>()
     .mockReturnValue(() => {});
@@ -298,7 +323,10 @@ beforeEach(() => {
     uploadDroppedFiles: uploadDroppedDriveFiles,
     listOfflineTasks,
     addOfflineTasks,
+    downloadVideo: downloadDriveVideo,
+    openDownloadFolder: openDriveDownloadFolder,
     onUploadProgress: onDriveUploadProgress,
+    onVideoDownloadProgress: onDriveVideoDownloadProgress,
   };
   const appearance: AppearanceApi = {
     get: getAppearance,
@@ -665,7 +693,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '网盘' }));
     await screen.findByText('电影');
-    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+    fireEvent.click(screen.getByRole('button', { name: '上传' }));
 
     await waitFor(() => {
       expect(uploadDriveFiles).toHaveBeenCalledWith({
@@ -697,7 +725,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '网盘' }));
     await screen.findByText('电影');
-    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+    fireEvent.click(screen.getByRole('button', { name: '上传' }));
 
     expect(await screen.findByLabelText('上传进度')).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -728,7 +756,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '网盘' }));
     await screen.findByText('电影');
-    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+    fireEvent.click(screen.getByRole('button', { name: '上传' }));
     await screen.findByLabelText('上传进度');
 
     fireEvent.click(screen.getByRole('button', { name: '设置' }));
@@ -945,6 +973,74 @@ describe('App', () => {
     expect(within(dialog).getByText('magnet:?xt=urn:btih:bbbb')).toBeDefined();
   });
 
+  it('downloads a selected video by its pickcode', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: driveAccount.connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '77',
+            parentId: '0',
+            name: 'movie.mp4',
+            kind: 'file',
+            size: 2048,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 120,
+            pickcode: 'video-pickcode',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+    downloadDriveVideo.mockResolvedValue({
+      ok: true,
+      data: {
+        canceled: false,
+        fileName: 'movie.mp4',
+        filePath: 'C:\\Downloads\\movie.mp4',
+        bytes: 2048,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('movie.mp4'));
+    fireEvent.click(screen.getByRole('button', { name: '下载' }));
+
+    await waitFor(() => {
+      expect(downloadDriveVideo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: driveAccount.connectionId,
+          pickcode: 'video-pickcode',
+          fileName: 'movie.mp4',
+        }),
+      );
+    });
+
+    expect(await screen.findByText('下载完成')).toBeDefined();
+    expect(screen.getByText('C:\\Downloads\\movie.mp4')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: '打开下载目录' }));
+
+    await waitFor(() => {
+      expect(openDriveDownloadFolder).toHaveBeenCalledWith(expect.any(String));
+    });
+  });
+
   it('searches only inside the current 115 folder', async () => {
     listDriveAccounts.mockResolvedValue({
       ok: true,
@@ -964,6 +1060,7 @@ describe('App', () => {
             modifiedAt: '2026-10-21T12:00:00.000Z',
             extension: 'md',
             durationSeconds: null,
+            pickcode: null,
           },
         ],
         offset: 0,

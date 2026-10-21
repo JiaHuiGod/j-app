@@ -41,6 +41,7 @@ export interface DriveEntry {
   readonly modifiedAt: string | null;
   readonly extension: string | null;
   readonly durationSeconds: number | null;
+  readonly pickcode: string | null;
 }
 
 export interface DriveListInput {
@@ -188,4 +189,36 @@ export interface DriveOfflineAddResult {
   readonly successCount: number;
   readonly failedCount: number;
   readonly errors: readonly DriveOfflineAddError[];
+}
+
+export interface DriveVideoDownloadInput {
+  readonly downloadId: string;
+  readonly connectionId: string;
+  readonly pickcode: string;
+  readonly fileName: string;
+}
+
+export interface DriveVideoDownloadResult {
+  readonly canceled: boolean;
+  readonly fileName: string;
+  readonly filePath: string | null;
+  readonly bytes: number;
+}
+
+export type DriveVideoDownloadStatus =
+  | 'canceled'
+  | 'downloading'
+  | 'failed'
+  | 'preparing'
+  | 'success';
+
+export interface DriveVideoDownloadProgress {
+  readonly downloadId: string;
+  readonly fileName: string;
+  readonly receivedBytes: number;
+  readonly totalBytes: number;
+  readonly status: DriveVideoDownloadStatus;
+  readonly bytesPerSecond?: number;
+  readonly error?: string;
+  readonly filePath?: string;
 }

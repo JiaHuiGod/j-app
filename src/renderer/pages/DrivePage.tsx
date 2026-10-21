@@ -15,9 +15,11 @@ import type {
   DriveResult,
   DriveUploadProgress,
   DriveUploadResult,
+  DriveVideoDownloadProgress,
 } from '@shared/drive';
 import { toErrorMessage } from '../lib/errors';
 import { DriveActionDialog } from '../components/DriveActionDialog';
+import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
 import { DriveOfflineDialog } from '../components/DriveOfflineDialog';
 import { DriveUploadPanel } from '../components/DriveUploadPanel';
@@ -473,6 +475,23 @@ function OfflineIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M10 3.6v8.8M6.8 9.2l3.2 3.2 3.2-3.2" />
+      <path d="M3.5 15.2h13" />
+    </svg>
+  );
+}
+
+function createDownloadId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `download-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
 function PencilIcon() {
   return (
     <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
@@ -802,6 +821,10 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [dialog, setDialog] = useState<DriveDialogState | null>(null);
   const [isOfflineOpen, setIsOfflineOpen] = useState(false);
   const [uploadBatch, setUploadBatch] = useState<UploadBatchState | null>(null);
+  const [downloadProgress, setDownloadProgress] =
+    useState<DriveVideoDownloadProgress | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const requestIdRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -811,6 +834,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const dragDepthRef = useRef(0);
   const uploadInFlightRef = useRef(false);
   const offlineSubmittedRef = useRef(false);
+  const activeDownloadIdRef = useRef<string | null>(null);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
 
@@ -829,6 +853,11 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   );
   const selectedEntry =
     selectedEntries.length === 1 ? selectedEntries[0] : null;
+  const selectedVideo =
+    selectedEntry?.kind === 'file' &&
+    getFileKind(selectedEntry.extension) === 'video'
+      ? selectedEntry
+      : null;
   const canMutate =
     Boolean(account) &&
     !isLoadingAccounts &&
@@ -837,7 +866,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     !accountError &&
     !isLoading;
   const isUploading = uploadBatch?.active ?? false;
-  const canDropFiles = canMutate && !isUploading;
+  const canDropFiles = canMutate && !isUploading && !isDownloading;
   const uploadItems = uploadBatch
     ? Object.values(uploadBatch.items).sort(
         (left, right) => left.fileIndex - right.fileIndex,
@@ -1060,6 +1089,26 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   }, []);
 
   useEffect(() => {
+    return window.desktop.drive.onVideoDownloadProgress((progress) => {
+      if (progress.downloadId !== activeDownloadIdRef.current) {
+        return;
+      }
+
+      if (progress.status === 'canceled') {
+        return;
+      }
+
+      setDownloadProgress(progress);
+
+      if (progress.status === 'failed') {
+        setDownloadError(progress.error ?? '视频下载失败，请稍后重试。');
+      } else if (progress.status === 'success') {
+        setDownloadError(null);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     if (
       !isActive ||
       !uploadBatch ||
@@ -1263,6 +1312,84 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         files,
       ),
     );
+  };
+
+  const handleDownloadVideo = async (entry: DriveEntry) => {
+    if (!account || isDownloading || !entry.pickcode) {
+      return;
+    }
+
+    const downloadId = createDownloadId();
+
+    activeDownloadIdRef.current = downloadId;
+    setIsDownloading(true);
+    setDownloadError(null);
+    setDownloadProgress({
+      downloadId,
+      fileName: entry.name,
+      receivedBytes: 0,
+      totalBytes: entry.size ?? 0,
+      status: 'preparing',
+    });
+
+    try {
+      const result = await window.desktop.drive.downloadVideo({
+        downloadId,
+        connectionId: account.connectionId,
+        pickcode: entry.pickcode,
+        fileName: entry.name,
+      });
+
+      if (!result.ok) {
+        setDownloadProgress((current) =>
+          current
+            ? {
+                ...current,
+                status: 'failed',
+                error: result.error.message,
+              }
+            : null,
+        );
+        setDownloadError(result.error.message);
+        return;
+      }
+
+      if (result.data.canceled) {
+        activeDownloadIdRef.current = null;
+        setDownloadProgress(null);
+        return;
+      }
+
+      setDownloadProgress((current) =>
+        current
+          ? {
+              ...current,
+              status: 'success',
+              receivedBytes: result.data.bytes,
+              totalBytes: result.data.bytes,
+              filePath: result.data.filePath ?? undefined,
+            }
+          : null,
+      );
+    } catch (downloadFailure: unknown) {
+      const message = toErrorMessage(
+        downloadFailure,
+        '视频下载失败，请稍后重试。',
+      );
+
+      setDownloadProgress((current) =>
+        current
+          ? {
+              ...current,
+              status: 'failed',
+              error: message,
+            }
+          : null,
+      );
+      setDownloadError(message);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   useEffect(() => {
@@ -1631,9 +1758,9 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                 <span className={styles.quickLabel}>新建文件夹</span>
               </button>
               <button
-                aria-label={isUploading ? '正在上传' : '上传到当前目录'}
+                aria-label={isUploading ? '正在上传' : '上传'}
                 className={`${styles.quickButton} ${styles.quickButtonUpload}`}
-                disabled={!canMutate || isUploading}
+                disabled={!canMutate || isUploading || isDownloading}
                 title="上传文件到当前目录，不会上传到已选文件夹"
                 type="button"
                 onClick={() => {
@@ -1642,7 +1769,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
               >
                 <UploadIcon />
                 <span className={styles.quickLabel}>
-                  {isUploading ? '上传中…' : '上传到当前目录'}
+                  {isUploading ? '上传中…' : '上传'}
                 </span>
               </button>
               <button
@@ -1771,6 +1898,29 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
 
             {selectedEntries.length > 0 && (
               <div className={styles.toolbarActions}>
+                {selectedVideo && (
+                  <button
+                    className={styles.toolButton}
+                    disabled={
+                      !canMutate ||
+                      isUploading ||
+                      isDownloading ||
+                      !selectedVideo.pickcode
+                    }
+                    title={
+                      selectedVideo.pickcode
+                        ? '下载视频到本地'
+                        : '该视频缺少下载标识'
+                    }
+                    type="button"
+                    onClick={() => {
+                      void handleDownloadVideo(selectedVideo);
+                    }}
+                  >
+                    <DownloadIcon />
+                    {isDownloading ? '下载中…' : '下载'}
+                  </button>
+                )}
                 <button
                   className={styles.toolButton}
                   disabled={
@@ -2008,6 +2158,30 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
           result={uploadBatch.result}
           onClose={() => {
             setUploadBatch(null);
+          }}
+        />
+      )}
+
+      {downloadProgress && (
+        <DriveDownloadPanel
+          error={downloadError}
+          progress={downloadProgress}
+          onClose={() => {
+            activeDownloadIdRef.current = null;
+            setDownloadProgress(null);
+            setDownloadError(null);
+          }}
+          onOpenFolder={() => {
+            void window.desktop.drive
+              .openDownloadFolder(downloadProgress.downloadId)
+              .then((result) => {
+                if (!result.ok) {
+                  setDownloadError(result.error.message);
+                }
+              })
+              .catch(() => {
+                setDownloadError('无法打开下载目录。');
+              });
           }}
         />
       )}

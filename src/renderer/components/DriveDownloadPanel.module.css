@@ -1,0 +1,199 @@
+.panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 31;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px -26px rgb(23 25 31 / 36%),
+    0 8px 24px -18px rgb(23 25 31 / 26%);
+  animation: download-enter 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.kicker {
+  margin: 0 0 2px;
+  color: var(--blue);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.56rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: -0.02em;
+}
+
+.closeButton {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.closeButton:hover {
+  color: var(--ink);
+  background: rgb(23 25 31 / 6%);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.fileName {
+  overflow: hidden;
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 0.67rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressTrack {
+  height: 5px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: rgb(23 25 31 / 7%);
+  border-radius: 999px;
+}
+
+.progressBar {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: inherit;
+  transition: width 0.2s ease;
+}
+
+.progressMeta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 5px;
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.58rem;
+}
+
+.speed {
+  color: var(--blue);
+}
+
+.path {
+  overflow-wrap: anywhere;
+  padding: 8px 9px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.57rem;
+  line-height: 1.5;
+  background: rgb(23 25 31 / 4%);
+  border-radius: 7px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 9px;
+}
+
+.openButton {
+  height: 28px;
+  padding: 0 11px;
+  color: var(--blue);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 650;
+  background: rgb(33 72 255 / 6%);
+  border: 1px solid rgb(33 72 255 / 18%);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.openButton:hover {
+  background: rgb(33 72 255 / 10%);
+}
+
+.openButton:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.error {
+  padding: 8px 9px;
+  margin: 10px 0 0;
+  color: #992d32;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  background: #fff0f0;
+  border: 1px solid #f1c9cb;
+  border-radius: 7px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .closeButton:hover {
+    background: rgb(255 255 255 / 7%);
+  }
+
+  .progressTrack {
+    background: rgb(255 255 255 / 8%);
+  }
+
+  .path {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .openButton {
+    color: #9fb0ff;
+    background: rgb(100 126 255 / 10%);
+    border-color: rgb(100 126 255 / 24%);
+  }
+
+  .openButton:hover {
+    background: rgb(100 126 255 / 16%);
+  }
+
+  .error {
+    color: #ffb1b4;
+    background: rgb(255 108 113 / 9%);
+    border-color: rgb(255 123 128 / 24%);
+  }
+}
+
+@keyframes download-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

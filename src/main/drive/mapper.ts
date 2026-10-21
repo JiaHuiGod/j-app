@@ -22,6 +22,7 @@ interface Raw115Item {
   readonly t?: unknown;
   readonly ico?: unknown;
   readonly play_long?: unknown;
+  readonly pc?: unknown;
 }
 
 interface Raw115ListResponse {
@@ -136,6 +137,7 @@ export function normalize115Entry(value: unknown): DriveEntry | null {
       modifiedAt: normalizeUnixTime(item.te ?? item.t),
       extension: null,
       durationSeconds: null,
+      pickcode: null,
     };
   }
 
@@ -156,6 +158,7 @@ export function normalize115Entry(value: unknown): DriveEntry | null {
     modifiedAt: normalizeUnixTime(item.te ?? item.t),
     extension: normalizeExtension(item.ico, name),
     durationSeconds: normalizeDuration(item.play_long),
+    pickcode: asString(item.pc) || null,
   };
 }
 

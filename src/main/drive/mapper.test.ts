@@ -46,6 +46,7 @@ describe('115 file normalization', () => {
       modifiedAt: '2024-10-21T08:40:00.000Z',
       extension: null,
       durationSeconds: null,
+      pickcode: null,
     });
 
     expect(
@@ -57,6 +58,7 @@ describe('115 file normalization', () => {
         s: '1024',
         te: '1729500000',
         ico: 'TXT',
+        pc: 'pickcode-txt',
       }),
     ).toEqual({
       id: '20',
@@ -67,6 +69,7 @@ describe('115 file normalization', () => {
       modifiedAt: '2024-10-21T08:40:00.000Z',
       extension: 'txt',
       durationSeconds: null,
+      pickcode: 'pickcode-txt',
     });
   });
 

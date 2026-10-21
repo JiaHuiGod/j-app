@@ -1,0 +1,597 @@
+import path from 'node:path';
+import { createWriteStream, promises as fs } from 'node:fs';
+import { dialog, net, shell, type Session, type WebContents } from 'electron';
+import type {
+  DriveError,
+  DriveErrorCode,
+  DriveResult,
+  DriveVideoDownloadProgress,
+  DriveVideoDownloadResult,
+} from '@shared/drive';
+import { IpcChannel } from '@shared/ipc';
+import { parseSiteConnectionId } from '../settings/schema';
+import { getMainWindow } from '../window';
+import { getAccountSession } from './115';
+import { fetch115JsonDetailed } from './115-http';
+
+const VIDEO_ENDPOINT = 'https://webapi.115.com/files/video?pickcode=';
+const MAX_PICKCODE_LENGTH = 128;
+const MAX_DOWNLOAD_ID_LENGTH = 128;
+const MAX_FILE_NAME_LENGTH = 200;
+const PROGRESS_INTERVAL_MS = 250;
+const VIDEO_EXTENSIONS = [
+  'mp4',
+  'mkv',
+  'avi',
+  'mov',
+  'wmv',
+  'flv',
+  'webm',
+  'm4v',
+  'ts',
+  'm2ts',
+];
+const PERSISTENT_COOKIE_NAMES = new Set([
+  'GST',
+  'USERSESSIONID',
+  'UID',
+  'CID',
+  'SEID',
+  'KID',
+  'PHPSESSID',
+  '115_lang',
+]);
+const completedDownloads = new Map<string, string>();
+
+interface ParsedDownloadRequest {
+  readonly downloadId: string;
+  readonly connectionId: string;
+  readonly pickcode: string;
+  readonly fileName: string;
+}
+
+interface VideoSource {
+  readonly downloadUrl: string;
+  /** m3u8 URL returned by 115; reserved for the future in-app player. */
+  readonly playUrl: string;
+  readonly setCookie: readonly string[];
+}
+
+function failure<T>(code: DriveErrorCode, message: string): DriveResult<T> {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+    },
+  };
+}
+
+function isDriveError(value: unknown): value is DriveError {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'code' in value &&
+    'message' in value
+  );
+}
+
+function asText(value: unknown): string {
+  return typeof value === 'string' || typeof value === 'number'
+    ? String(value).trim()
+    : '';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : '视频下载失败，请稍后重试。';
+}
+
+function parseHttpUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value.replaceAll('&amp;', '&'));
+
+    return url.protocol === 'http:' || url.protocol === 'https:'
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeFileName(value: unknown): string {
+  const rawName = [...path.basename(asText(value))]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join('');
+  const baseName = rawName
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .slice(0, MAX_FILE_NAME_LENGTH);
+
+  return baseName || 'video.mp4';
+}
+
+function parseDownloadRequest(
+  value: unknown,
+): ParsedDownloadRequest | DriveError {
+  if (typeof value !== 'object' || value === null) {
+    return {
+      code: 'invalid_input',
+      message: '视频下载参数不正确。',
+    };
+  }
+
+  const input = value as Record<string, unknown>;
+  let connectionId: string;
+
+  try {
+    connectionId = parseSiteConnectionId(input.connectionId);
+  } catch {
+    return {
+      code: 'invalid_input',
+      message: '站点连接 ID 格式不正确。',
+    };
+  }
+
+  const downloadId = asText(input.downloadId);
+  const pickcode = asText(input.pickcode);
+
+  if (
+    !downloadId ||
+    downloadId.length > MAX_DOWNLOAD_ID_LENGTH ||
+    !pickcode ||
+    pickcode.length > MAX_PICKCODE_LENGTH ||
+    !/^[A-Za-z0-9_-]+$/.test(pickcode)
+  ) {
+    return {
+      code: 'invalid_input',
+      message: '视频下载参数不正确。',
+    };
+  }
+
+  return {
+    downloadId,
+    connectionId,
+    pickcode,
+    fileName: sanitizeFileName(input.fileName),
+  };
+}
+
+function sendProgress(
+  sender: WebContents,
+  progress: DriveVideoDownloadProgress,
+): void {
+  if (!sender.isDestroyed()) {
+    sender.send(IpcChannel.DriveVideoDownloadProgress, progress);
+  }
+}
+
+async function getVideoSource(
+  siteSession: Session,
+  pickcode: string,
+): Promise<DriveResult<VideoSource>> {
+  const response = await fetch115JsonDetailed(
+    siteSession,
+    `${VIDEO_ENDPOINT}${encodeURIComponent(pickcode)}`,
+  );
+
+  if (!response.ok) {
+    return response;
+  }
+
+  const downloadUrl = parseHttpUrl(response.data.data.origin_file_url);
+  const playUrl = parseHttpUrl(response.data.data.video_url);
+
+  if (!downloadUrl) {
+    return failure('api', '115 没有返回可用的视频下载地址。');
+  }
+
+  await discardSetCookies(siteSession, downloadUrl, response.data.setCookie);
+
+  return {
+    ok: true,
+    data: {
+      downloadUrl,
+      playUrl: playUrl ?? '',
+      setCookie: response.data.setCookie,
+    },
+  };
+}
+
+function is115Host(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+
+    return host === '115.com' || host.endsWith('.115.com');
+  } catch {
+    return false;
+  }
+}
+
+async function getDownloadCookieHeader(
+  siteSession: Session,
+  sourceUrl: string,
+  setCookieHeaders: readonly string[],
+): Promise<string> {
+  if (!is115Host(sourceUrl)) {
+    return '';
+  }
+
+  const cookies = new Map<string, string>();
+
+  for (const cookieUrl of [
+    sourceUrl,
+    'https://115.com/',
+    'https://webapi.115.com/',
+  ]) {
+    const entries = await siteSession.cookies.get({ url: cookieUrl });
+
+    for (const cookie of entries) {
+      if (!cookies.has(cookie.name)) {
+        cookies.set(cookie.name, cookie.value);
+      }
+    }
+  }
+
+  for (const header of setCookieHeaders) {
+    const pair = header.split(';', 1)[0]?.trim() ?? '';
+    const separator = pair.indexOf('=');
+
+    if (separator > 0) {
+      const name = pair.slice(0, separator).trim();
+      const value = pair.slice(separator + 1).trim();
+
+      if (name && value) {
+        cookies.set(name, value);
+      }
+    }
+  }
+
+  return [...cookies.entries()]
+    .map(([name, value]) => `${name}=${value}`)
+    .join('; ');
+}
+
+async function discardSetCookies(
+  siteSession: Session,
+  url: string,
+  setCookieHeaders: readonly string[],
+): Promise<void> {
+  await Promise.all(
+    setCookieHeaders.map(async (header) => {
+      const pair = header.split(';', 1)[0]?.trim() ?? '';
+      const separator = pair.indexOf('=');
+
+      if (separator <= 0) {
+        return;
+      }
+
+      const name = pair.slice(0, separator).trim();
+
+      if (!name || PERSISTENT_COOKIE_NAMES.has(name)) {
+        return;
+      }
+
+      await siteSession.cookies.remove(url, name).catch(() => undefined);
+    }),
+  );
+}
+
+async function downloadToFile(
+  sender: WebContents,
+  siteSession: Session,
+  sourceUrl: string,
+  sourceSetCookie: readonly string[],
+  destination: string,
+  requestInfo: ParsedDownloadRequest,
+): Promise<number> {
+  const cookieHeader = await getDownloadCookieHeader(
+    siteSession,
+    sourceUrl,
+    sourceSetCookie,
+  );
+  const tempPath = `${destination}.japp-part`;
+
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.rm(tempPath, { force: true });
+
+  const stream = createWriteStream(tempPath, { flags: 'w' });
+  let receivedBytes = 0;
+  let totalBytes = 0;
+  let lastProgressAt = 0;
+  let lastSampleBytes = 0;
+  let lastSampleAt = Date.now();
+  let bytesPerSecond = 0;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+
+      const request = net.request({
+        method: 'GET',
+        url: sourceUrl,
+        session: siteSession,
+      });
+
+      const fail = (error: unknown) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        request.abort();
+        stream.destroy();
+        reject(error);
+      };
+
+      request.setHeader('Accept', '*/*');
+      request.setHeader('Referer', 'https://115.com/');
+
+      const userAgent = siteSession.getUserAgent();
+
+      if (userAgent) {
+        request.setHeader('User-Agent', userAgent);
+      }
+
+      if (cookieHeader) {
+        request.setHeader('Cookie', cookieHeader);
+      }
+
+      request.on('error', () => {
+        fail(new Error('无法连接视频下载地址。'));
+      });
+
+      request.on('response', (response) => {
+        const readable = response as unknown as NodeJS.ReadableStream;
+
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          let body = '';
+
+          response.on('data', (chunk: Buffer) => {
+            if (body.length < 500) {
+              body += Buffer.from(chunk).toString('utf8');
+            }
+          });
+          response.on('end', () => {
+            fail(
+              new Error(
+                `视频下载地址返回失败（HTTP ${response.statusCode}）：${body.slice(0, 200)}`,
+              ),
+            );
+          });
+          readable.resume();
+          return;
+        }
+
+        const contentLength = Number(response.headers['content-length']);
+        totalBytes =
+          Number.isFinite(contentLength) && contentLength > 0
+            ? contentLength
+            : 0;
+
+        sendProgress(sender, {
+          downloadId: requestInfo.downloadId,
+          fileName: requestInfo.fileName,
+          receivedBytes: 0,
+          totalBytes,
+          status: 'downloading',
+        });
+
+        readable.on('data', (chunk: Buffer) => {
+          receivedBytes += Buffer.from(chunk).length;
+          const now = Date.now();
+
+          if (now - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+            const elapsedSeconds = (now - lastSampleAt) / 1000;
+            const instantSpeed =
+              elapsedSeconds > 0
+                ? (receivedBytes - lastSampleBytes) / elapsedSeconds
+                : 0;
+
+            bytesPerSecond =
+              bytesPerSecond > 0
+                ? bytesPerSecond * 0.6 + instantSpeed * 0.4
+                : instantSpeed;
+            lastSampleAt = now;
+            lastSampleBytes = receivedBytes;
+            lastProgressAt = now;
+
+            sendProgress(sender, {
+              downloadId: requestInfo.downloadId,
+              fileName: requestInfo.fileName,
+              receivedBytes,
+              totalBytes,
+              bytesPerSecond: Math.max(0, Math.round(bytesPerSecond)),
+              status: 'downloading',
+            });
+          }
+        });
+
+        readable.pipe(stream);
+
+        stream.on('finish', () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        });
+      });
+
+      stream.on('error', (error) => {
+        fail(error);
+      });
+
+      request.end();
+    });
+
+    await fs.rm(destination, { force: true });
+    await fs.rename(tempPath, destination);
+
+    sendProgress(sender, {
+      downloadId: requestInfo.downloadId,
+      fileName: requestInfo.fileName,
+      receivedBytes,
+      totalBytes,
+      status: 'success',
+      filePath: destination,
+    });
+
+    return receivedBytes;
+  } catch (error) {
+    await fs.rm(tempPath, { force: true });
+    throw error;
+  }
+}
+
+export async function download115Video(
+  sender: WebContents,
+  value: unknown,
+): Promise<DriveResult<DriveVideoDownloadResult>> {
+  const request = parseDownloadRequest(value);
+
+  if (isDriveError(request)) {
+    return { ok: false, error: request };
+  }
+
+  const siteSession = await getAccountSession(request.connectionId);
+
+  if (isDriveError(siteSession)) {
+    return { ok: false, error: siteSession };
+  }
+
+  sendProgress(sender, {
+    downloadId: request.downloadId,
+    fileName: request.fileName,
+    receivedBytes: 0,
+    totalBytes: 0,
+    status: 'preparing',
+  });
+
+  const source = await getVideoSource(siteSession, request.pickcode);
+
+  if (!source.ok) {
+    sendProgress(sender, {
+      downloadId: request.downloadId,
+      fileName: request.fileName,
+      receivedBytes: 0,
+      totalBytes: 0,
+      status: 'failed',
+      error: source.error.message,
+    });
+
+    return source;
+  }
+
+  const parent = getMainWindow();
+  const options = {
+    title: '保存视频',
+    defaultPath: request.fileName,
+    filters: [
+      { name: '视频文件', extensions: VIDEO_EXTENSIONS },
+      { name: '所有文件', extensions: ['*'] },
+    ],
+  };
+  const selection = parent
+    ? await dialog.showSaveDialog(parent, options)
+    : await dialog.showSaveDialog(options);
+
+  if (selection.canceled || !selection.filePath) {
+    sendProgress(sender, {
+      downloadId: request.downloadId,
+      fileName: request.fileName,
+      receivedBytes: 0,
+      totalBytes: 0,
+      status: 'canceled',
+    });
+
+    return {
+      ok: true,
+      data: {
+        canceled: true,
+        fileName: request.fileName,
+        filePath: null,
+        bytes: 0,
+      },
+    };
+  }
+
+  try {
+    const bytes = await downloadToFile(
+      sender,
+      siteSession,
+      source.data.downloadUrl,
+      source.data.setCookie,
+      selection.filePath,
+      request,
+    );
+
+    completedDownloads.set(request.downloadId, selection.filePath);
+
+    return {
+      ok: true,
+      data: {
+        canceled: false,
+        fileName: request.fileName,
+        filePath: selection.filePath,
+        bytes,
+      },
+    };
+  } catch (error) {
+    const message = errorMessage(error);
+
+    sendProgress(sender, {
+      downloadId: request.downloadId,
+      fileName: request.fileName,
+      receivedBytes: 0,
+      totalBytes: 0,
+      status: 'failed',
+      error: message,
+    });
+
+    return {
+      ok: false,
+      error: {
+        code: 'network',
+        message,
+      },
+    };
+  }
+}
+
+export function open115DownloadFolder(value: unknown): DriveResult<null> {
+  const downloadId = typeof value === 'string' ? value.trim() : '';
+
+  if (!downloadId || downloadId.length > MAX_DOWNLOAD_ID_LENGTH) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_input',
+        message: '下载记录参数不正确。',
+      },
+    };
+  }
+
+  const filePath = completedDownloads.get(downloadId);
+
+  if (!filePath) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_input',
+        message: '没有找到已完成的下载记录。',
+      },
+    };
+  }
+
+  shell.showItemInFolder(filePath);
+
+  return { ok: true, data: null };
+}

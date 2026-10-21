@@ -18,6 +18,7 @@ import {
 } from './actions';
 import { getAccountSession } from './115';
 import { listDriveAccounts } from './accounts';
+import { download115Video, open115DownloadFolder } from './download';
 import { add115OfflineTasks, list115OfflineTasks } from './offline';
 import { upload115Files } from './upload';
 import { list115Folder, search115Folder } from './115';
@@ -361,6 +362,28 @@ export function registerDriveIpcHandlers(): void {
         return await add115OfflineTasks(input);
       } catch (error) {
         return unexpectedFailure('add 115 offline tasks', error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.DownloadDriveVideo,
+    async (event, input: unknown) => {
+      try {
+        return await download115Video(event.sender, input);
+      } catch (error) {
+        return unexpectedFailure('download 115 video', error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.OpenDriveDownloadFolder,
+    async (_event, input: unknown) => {
+      try {
+        return open115DownloadFolder(input);
+      } catch (error) {
+        return unexpectedFailure('open 115 download folder', error);
       }
     },
   );

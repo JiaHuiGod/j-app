@@ -21,6 +21,9 @@ import type {
   DriveUploadInput,
   DriveUploadProgress,
   DriveUploadResult,
+  DriveVideoDownloadInput,
+  DriveVideoDownloadProgress,
+  DriveVideoDownloadResult,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
@@ -58,7 +61,10 @@ export const IpcChannel = {
   UploadDroppedDriveFiles: 'drive:upload-dropped-files',
   ListDriveOfflineTasks: 'drive:offline-list',
   AddDriveOfflineTasks: 'drive:offline-add',
+  DownloadDriveVideo: 'drive:video-download',
+  OpenDriveDownloadFolder: 'drive:video-open-folder',
   DriveUploadProgress: 'drive:upload-progress',
+  DriveVideoDownloadProgress: 'drive:video-download-progress',
 } as const;
 
 export interface AppInfo {
@@ -127,8 +133,15 @@ export interface DriveApi {
   addOfflineTasks: (
     input: DriveOfflineAddInput,
   ) => Promise<DriveResult<DriveOfflineAddResult>>;
+  downloadVideo: (
+    input: DriveVideoDownloadInput,
+  ) => Promise<DriveResult<DriveVideoDownloadResult>>;
+  openDownloadFolder: (downloadId: string) => Promise<DriveResult<null>>;
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,
+  ) => () => void;
+  onVideoDownloadProgress: (
+    listener: (progress: DriveVideoDownloadProgress) => void,
   ) => () => void;
 }
 

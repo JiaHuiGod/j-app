@@ -6,6 +6,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 export interface DriveHttpResponse {
   readonly status: number;
   readonly body: string;
+  readonly setCookie: readonly string[];
 }
 
 export interface DriveHttpRequestOptions {
@@ -90,11 +91,19 @@ export async function request115(
       });
 
       response.on('end', () => {
+        const rawSetCookie = response.headers['set-cookie'];
+        const setCookie = Array.isArray(rawSetCookie)
+          ? rawSetCookie.map(String)
+          : rawSetCookie
+            ? [String(rawSetCookie)]
+            : [];
+
         finish({
           ok: true,
           data: {
             status: response.statusCode,
             body: Buffer.concat(chunks).toString('utf8'),
+            setCookie,
           },
         });
       });
@@ -116,11 +125,16 @@ export async function request115(
   });
 }
 
-export async function fetch115Json(
+export async function fetch115JsonDetailed(
   siteSession: Session,
   url: string,
   options?: DriveHttpRequestOptions,
-): Promise<DriveResult<Record<string, unknown>>> {
+): Promise<
+  DriveResult<{
+    data: Record<string, unknown>;
+    setCookie: readonly string[];
+  }>
+> {
   const response = await request115(siteSession, url, options);
 
   if (!response.ok) {
@@ -181,5 +195,21 @@ export async function fetch115Json(
     );
   }
 
-  return { ok: true, data: record };
+  return {
+    ok: true,
+    data: {
+      data: record,
+      setCookie: response.data.setCookie,
+    },
+  };
+}
+
+export async function fetch115Json(
+  siteSession: Session,
+  url: string,
+  options?: DriveHttpRequestOptions,
+): Promise<DriveResult<Record<string, unknown>>> {
+  const response = await fetch115JsonDetailed(siteSession, url, options);
+
+  return response.ok ? { ok: true, data: response.data.data } : response;
 }
