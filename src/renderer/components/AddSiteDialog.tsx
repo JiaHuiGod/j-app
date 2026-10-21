@@ -5,7 +5,10 @@ import {
   type FormEvent,
   type SyntheticEvent,
 } from 'react';
-import type { SiteConnectionSummary } from '@shared/connections';
+import type {
+  CreateSiteConnectionInput,
+  SiteConnectionSummary,
+} from '@shared/connections';
 import { toErrorMessage } from '../lib/errors';
 import ui from '../styles/ui.module.css';
 import { GlobeIcon } from './GlobeIcon';
@@ -15,6 +18,8 @@ interface AddSiteDialogProps {
   onClose: () => void;
   onAdded: (connection: SiteConnectionSummary) => void;
 }
+
+type SubmitAction = 'login' | 'preset';
 
 function isValidLoginUrl(value: string): boolean {
   try {
@@ -38,8 +43,9 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [loginUrl, setLoginUrl] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingAction, setPendingAction] = useState<SubmitAction | null>(null);
   const [error, setError] = useState('');
+  const isSubmitting = pendingAction !== null;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -79,46 +85,67 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
     }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (isSubmitting) {
-      return;
-    }
-
+  const validateInput = (): CreateSiteConnectionInput | null => {
     const trimmedName = name.trim();
     const trimmedUrl = loginUrl.trim();
 
     if (!trimmedName) {
       setError('请输入站点名称。');
-      return;
+      return null;
     }
 
     if (!isValidLoginUrl(trimmedUrl)) {
       setError(
         '请输入有效的 HTTPS 登录地址；本地开发可以使用 http://localhost。',
       );
+      return null;
+    }
+
+    return {
+      name: trimmedName,
+      loginUrl: trimmedUrl,
+    };
+  };
+
+  const handleSave = async (action: SubmitAction) => {
+    if (isSubmitting) {
       return;
     }
 
-    setIsSubmitting(true);
+    const input = validateInput();
+
+    if (!input) {
+      return;
+    }
+
+    setPendingAction(action);
     setError('');
 
     try {
-      const connection = await window.desktop.connections.create({
-        name: trimmedName,
-        loginUrl: trimmedUrl,
-      });
+      const connection =
+        action === 'login'
+          ? await window.desktop.connections.create(input)
+          : await window.desktop.connections.createPreset(input);
 
       onAdded(connection);
       onClose();
     } catch (submitFailure: unknown) {
       setError(
-        toErrorMessage(submitFailure, '保存站点 Cookie 失败，请稍后重试。'),
+        toErrorMessage(
+          submitFailure,
+          action === 'login'
+            ? '保存站点 Cookie 失败，请稍后重试。'
+            : '保存站点失败，请稍后重试。',
+        ),
       );
     } finally {
-      setIsSubmitting(false);
+      setPendingAction(null);
     }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void handleSave('login');
   };
 
   return (
@@ -201,8 +228,8 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
           <div className={styles.note}>
             <span aria-hidden="true">i</span>
             <p>
-              点击下方按钮后会打开独立登录窗口。完成登录后关闭该窗口，应用会检测并保存该站点的
-              Cookie。
+              “保存并登录”会打开独立登录窗口；完成登录后关闭窗口即可保存
+              Cookie。“仅保存站点”只记录名称和地址，之后可在列表中随时登录。
             </p>
           </div>
         </div>
@@ -217,11 +244,21 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
             取消
           </button>
           <button
+            className={`${ui.button} ${ui.buttonSecondary}`}
+            disabled={isSubmitting}
+            type="button"
+            onClick={() => {
+              void handleSave('preset');
+            }}
+          >
+            {pendingAction === 'preset' ? '保存中…' : '仅保存站点'}
+          </button>
+          <button
             className={`${ui.button} ${ui.buttonPrimary}`}
             disabled={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? (
+            {pendingAction === 'login' ? (
               <>
                 <span
                   className={`${ui.spinner} ${ui.spinnerSmall}`}
@@ -230,7 +267,7 @@ export function AddSiteDialog({ onClose, onAdded }: AddSiteDialogProps) {
                 等待登录窗口…
               </>
             ) : (
-              '打开登录窗口'
+              '保存并登录'
             )}
           </button>
         </footer>

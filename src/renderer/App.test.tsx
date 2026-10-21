@@ -45,6 +45,16 @@ const siteConnection: SiteConnectionSummary = {
   status: 'connected',
 };
 
+const presetConnection: SiteConnectionSummary = {
+  id: '2c9c0f1e-3f4a-4f0e-9f6a-1b2c3d4e5f60',
+  name: 'GitLab',
+  loginUrl: 'https://gitlab.com/users/sign_in',
+  createdAt: '2026-10-21T03:00:00.000Z',
+  lastLoginAt: null,
+  cookieCount: 0,
+  status: 'empty',
+};
+
 let getAppInfo: ReturnType<typeof vi.fn<() => Promise<AppInfo>>>;
 let getProxy: ReturnType<typeof vi.fn<() => Promise<ProxySettings>>>;
 let saveProxy: ReturnType<
@@ -54,6 +64,9 @@ let toggleMaximize: ReturnType<typeof vi.fn<() => void>>;
 let restartApp: ReturnType<typeof vi.fn<() => void>>;
 let listConnections: ReturnType<typeof vi.fn<ConnectionsApi['list']>>;
 let createConnection: ReturnType<typeof vi.fn<ConnectionsApi['create']>>;
+let createPresetConnection: ReturnType<
+  typeof vi.fn<ConnectionsApi['createPreset']>
+>;
 let loginConnection: ReturnType<typeof vi.fn<ConnectionsApi['login']>>;
 let removeConnection: ReturnType<typeof vi.fn<ConnectionsApi['remove']>>;
 let clearAllConnections: ReturnType<typeof vi.fn<ConnectionsApi['clearAll']>>;
@@ -74,6 +87,9 @@ beforeEach(() => {
   createConnection = vi
     .fn<ConnectionsApi['create']>()
     .mockResolvedValue(siteConnection);
+  createPresetConnection = vi
+    .fn<ConnectionsApi['createPreset']>()
+    .mockResolvedValue(presetConnection);
   loginConnection = vi
     .fn<ConnectionsApi['login']>()
     .mockResolvedValue(siteConnection);
@@ -105,6 +121,7 @@ beforeEach(() => {
   const connections: ConnectionsApi = {
     list: listConnections,
     create: createConnection,
+    createPreset: createPresetConnection,
     login: loginConnection,
     remove: removeConnection,
     clearAll: clearAllConnections,
@@ -240,15 +257,50 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('登录地址'), {
       target: { value: 'https://github.com/login' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '打开登录窗口' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存并登录' }));
 
     expect(await screen.findByText('GitHub')).toBeDefined();
     expect(createConnection).toHaveBeenCalledWith({
       name: 'GitHub',
       loginUrl: 'https://github.com/login',
     });
+    expect(createPresetConnection).not.toHaveBeenCalled();
     expect(screen.getByText('已保存')).toBeDefined();
     expect(screen.getByText(/2 个 Cookie/)).toBeDefined();
+  });
+
+  it('saves a site preset without starting the login flow', async () => {
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByText('还没有保存的站点');
+
+    fireEvent.click(screen.getByRole('button', { name: '添加站点' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: '添加站点' }),
+    ).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('站点名称'), {
+      target: { value: 'GitLab' },
+    });
+    fireEvent.change(screen.getByLabelText('登录地址'), {
+      target: { value: 'https://gitlab.com/users/sign_in' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '仅保存站点' }));
+
+    expect(await screen.findByText('GitLab')).toBeDefined();
+    expect(createPresetConnection).toHaveBeenCalledWith({
+      name: 'GitLab',
+      loginUrl: 'https://gitlab.com/users/sign_in',
+    });
+    expect(createConnection).not.toHaveBeenCalled();
+    expect(screen.getByText('待登录')).toBeDefined();
+    expect(screen.getByRole('button', { name: '登录' })).toBeDefined();
+    expect(screen.queryByText('已保存')).toBeNull();
   });
 
   it('reopens and removes an existing site connection', async () => {

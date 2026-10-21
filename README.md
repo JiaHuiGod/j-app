@@ -113,7 +113,7 @@ j-app/
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
 │  │  ├─ components/
-│  │  │  ├─ AddSiteDialog.tsx    # 添加站点登录弹窗
+│  │  │  ├─ AddSiteDialog.tsx    # 添加站点或仅保存预设
 │  │  │  ├─ AppMark.tsx          # 与桌面图标一致的内联 SVG 标志
 │  │  │  ├─ ClearAllSitesDialog.tsx # 清理全部站点确认弹窗
 │  │  │  ├─ GlobeIcon.tsx        # 网络代理与站点图标
@@ -276,6 +276,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 设置页现在可以管理多个需要登录的站点：
 
 - 每个连接使用独立的 `persist:japp-site-<uuid>` Session，同一站点可保存多个账号；
+- 添加站点时可以“仅保存站点”作为预设，不打开登录窗口；之后从列表随时登录；
 - 用户通过独立的登录窗口手动登录，关闭窗口后应用检测并保存 Cookie；
 - Cookie 由 Chromium 加密持久化，不进入 `settings.json`、React state 或 IPC 返回值；
 - 登录 Session 复用当前代理配置；

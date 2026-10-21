@@ -264,8 +264,8 @@ export function SettingsPage() {
               <div>
                 <h3>还没有保存的站点</h3>
                 <p>
-                  添加一个需要登录的网站，完成登录后关闭登录窗口， Cookie
-                  会保存在独立的持久会话中。
+                  添加需要登录的网站，也可以先仅保存站点信息。
+                  完成登录后关闭登录窗口，Cookie 会保存在独立的持久会话中。
                 </p>
               </div>
             </div>
@@ -291,7 +291,7 @@ export function SettingsPage() {
                         className={`${styles.state}${isConnected ? ` ${styles.connected}` : ''}`}
                       >
                         <span aria-hidden="true" />
-                        {isConnected ? '已保存' : '未连接'}
+                        {isConnected ? '已保存' : '待登录'}
                       </span>
                     </div>
                     <span className={styles.url} title={connection.loginUrl}>

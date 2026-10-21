@@ -4,6 +4,7 @@ import { getAppearanceState, setAppearanceTheme } from './appearance/theme';
 import {
   clearAllSiteConnectionData,
   createSiteConnection,
+  createSitePreset,
   listSiteConnections,
   loginSiteConnection,
   removeSiteConnectionData,
@@ -50,6 +51,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannel.ListSiteConnections, () => listSiteConnections());
   ipcMain.handle(IpcChannel.CreateSiteConnection, (_event, input: unknown) =>
     createSiteConnection(input),
+  );
+  ipcMain.handle(IpcChannel.CreateSitePreset, (_event, input: unknown) =>
+    createSitePreset(input),
   );
   ipcMain.handle(
     IpcChannel.LoginSiteConnection,

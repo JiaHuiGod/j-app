@@ -50,6 +50,9 @@ const connections = Object.freeze<ConnectionsApi>({
   create: (input: CreateSiteConnectionInput) => {
     return ipcRenderer.invoke(IpcChannel.CreateSiteConnection, input);
   },
+  createPreset: (input: CreateSiteConnectionInput) => {
+    return ipcRenderer.invoke(IpcChannel.CreateSitePreset, input);
+  },
   login: (connectionId: string) => {
     return ipcRenderer.invoke(IpcChannel.LoginSiteConnection, connectionId);
   },

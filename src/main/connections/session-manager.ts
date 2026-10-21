@@ -254,6 +254,21 @@ export async function createSiteConnection(
   }
 }
 
+/**
+ * Saves only the site metadata. No login window is opened; the user can start
+ * the login flow later from the settings list.
+ */
+export async function createSitePreset(
+  input: unknown,
+): Promise<SiteConnectionSummary> {
+  const parsedInput = parseCreateSiteConnectionInput(input);
+  const connection = buildDraftConnection(parsedInput);
+
+  await addSiteConnection(connection);
+
+  return summarizeConnection(connection, 0);
+}
+
 export async function loginSiteConnection(
   input: unknown,
 ): Promise<SiteConnectionSummary> {

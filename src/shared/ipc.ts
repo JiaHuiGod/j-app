@@ -24,6 +24,7 @@ export const IpcChannel = {
   RestartApp: 'app:restart',
   ListSiteConnections: 'connections:list',
   CreateSiteConnection: 'connections:create',
+  CreateSitePreset: 'connections:create-preset',
   LoginSiteConnection: 'connections:login',
   RemoveSiteConnection: 'connections:remove',
   ClearSiteConnections: 'connections:clear-all',
@@ -61,7 +62,12 @@ export interface AppearanceApi {
 
 export interface ConnectionsApi {
   list: () => Promise<readonly SiteConnectionSummary[]>;
+  /** Starts the login flow and saves the site after cookies are captured. */
   create: (input: CreateSiteConnectionInput) => Promise<SiteConnectionSummary>;
+  /** Saves only the site metadata so it can be logged into later. */
+  createPreset: (
+    input: CreateSiteConnectionInput,
+  ) => Promise<SiteConnectionSummary>;
   login: (connectionId: string) => Promise<SiteConnectionSummary>;
   remove: (connectionId: string) => Promise<void>;
   clearAll: () => Promise<number>;

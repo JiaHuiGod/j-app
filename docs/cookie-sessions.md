@@ -5,6 +5,7 @@
 应用需要访问多个需要登录的网站。该功能提供：
 
 - 为每个站点、每个账号保存独立的持久登录态；
+- 支持仅保存站点名称与地址作为预设，不打开登录窗口，之后从列表随时登录；
 - 在应用内打开受控的登录窗口，由用户手动完成登录；
 - Cookie 由 Electron/Chromium 的持久 Session 保存，不写入应用配置、不返回 React 渲染层；
 - 支持多个站点、同一站点的多个账号；
@@ -57,7 +58,7 @@ Main
 | `src/main/settings/schema.ts`                     | 配置校验、连接元数据校验、v1 → v2 迁移   |
 | `src/main/settings/store.ts`                      | 连接元数据读写                           |
 | `src/renderer/pages/SettingsPage.tsx`             | 连接列表、资源提示、登录、移除、全部清理 |
-| `src/renderer/components/AddSiteDialog.tsx`       | 添加站点表单                             |
+| `src/renderer/components/AddSiteDialog.tsx`       | 添加站点或仅保存预设                     |
 | `src/renderer/components/ClearAllSitesDialog.tsx` | 清理全部站点确认弹窗                     |
 | `src/preload/index.ts`                            | 只暴露状态与操作，不暴露 Cookie          |
 
@@ -135,7 +136,14 @@ Chromium Partition  → Cookie 本体
 
 这是中心配置原则的明确例外，功能文档和代码中都保持这一边界。
 
-## 4. 登录流程
+## 4. 添加与登录流程
+
+添加站点有两个入口：
+
+- **仅保存站点**：调用 `createPreset`，只写入名称、URL 等元数据，不打开登录窗口；
+- **保存并登录**：打开受控登录窗口，登录成功后写入元数据并保存 Cookie。
+
+预设站点在列表中显示为“待登录”，操作按钮为“登录”；点击后复用同一套登录窗口和分区流程。
 
 1. 用户在设置页填写站点名称与登录地址；
 2. 主进程校验名称和 URL，生成 UUID；
@@ -305,6 +313,7 @@ const cookieHeader = cookies
 ```ts
 ListSiteConnections: 'connections:list',
 CreateSiteConnection: 'connections:create',
+CreateSitePreset: 'connections:create-preset',
 LoginSiteConnection: 'connections:login',
 RemoveSiteConnection: 'connections:remove',
 ClearSiteConnections: 'connections:clear-all',
@@ -316,6 +325,9 @@ ClearSiteConnections: 'connections:clear-all',
 interface ConnectionsApi {
   list(): Promise<readonly SiteConnectionSummary[]>;
   create(input: CreateSiteConnectionInput): Promise<SiteConnectionSummary>;
+  createPreset(
+    input: CreateSiteConnectionInput,
+  ): Promise<SiteConnectionSummary>;
   login(connectionId: string): Promise<SiteConnectionSummary>;
   remove(connectionId: string): Promise<void>;
   clearAll(): Promise<number>;
@@ -353,6 +365,7 @@ interface SiteConnectionSummary {
 
 | 场景                  | 行为                                                                   |
 | --------------------- | ---------------------------------------------------------------------- |
+| 仅保存站点            | 只写元数据，不创建登录窗口；列表显示“待登录”                           |
 | 登录窗口内没有 Cookie | 新建不保存，旧连接保留并提示失败                                       |
 | 用户提前关闭登录窗口  | 与“没有 Cookie”相同                                                    |
 | 添加站点失败          | 清理新建的临时 partition                                               |
@@ -360,7 +373,7 @@ interface SiteConnectionSummary {
 | 登录窗口已存在        | 拒绝第二个登录窗口                                                     |
 | 删除站点              | 清空 partition 数据后删除元数据                                        |
 | 清理全部站点数据      | 清空所有 partition 后删除所有元数据；空目录在下次启动时回收            |
-| 清理中途失败          | 保留元数据，用户可重试；已清空的连接会显示未连接状态                   |
+| 清理中途失败          | 保留元数据，用户可重试；已清空的连接会显示待登录状态                   |
 | 启动时无主分区        | 删除没有连接元数据的 `japp-site-<uuid>` 分区                           |
 | Cookie 过期           | 状态仍可能显示“已保存”，以 Cookie 数量为准；需要重新登录或后续验证策略 |
 
@@ -401,6 +414,8 @@ interface SiteConnectionSummary {
 已通过本地测试站点完成端到端验证：
 
 - 连续添加两个登录会话，两个独立 partition 均成功保存 Cookie；
+- 仅保存站点不会打开登录窗口，页面目标数量保持为 1；
+- 仅保存的元数据写入 `settings.json`，重启后仍显示“待登录”；点击“登录”会重新打开登录窗口；
 - 每个连接检测到 2 个 Cookie，`settings.json` 仅包含连接元数据，不包含 Cookie 值；
 - 每个 partition 生成独立的 Cookies SQLite 文件，Cookie 以大整数过期时间和非空加密值存储；
 - 强制结束应用并重启后，连接仍显示 `2 个 Cookie / 已保存`；
@@ -411,7 +426,7 @@ interface SiteConnectionSummary {
 - 启动时保留有元数据的 partition、删除伪造的无主 partition，并保留不符合命名规则的目录；
 - 登录窗口 User-Agent 为标准桌面 Chrome UA，不包含 `Electron`；请求语言头为中文优先；
 - 在 900×620 视口下设置页无横向溢出；
-- Vitest 覆盖添加、列表、重新登录、移除、清理全部和渲染层资源提示；
+- Vitest 覆盖添加、仅保存站点、列表、重新登录、移除、清理全部和渲染层资源提示；
 - 打包运行期间无渲染层异常或控制台错误。
 
 本地开发验证可以使用回环 HTTP 服务返回：
