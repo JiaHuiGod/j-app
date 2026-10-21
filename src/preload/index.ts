@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { ThemePreference } from '@shared/appearance';
 import type { CreateSiteConnectionInput } from '@shared/connections';
+import type { DriveListInput, DriveSearchInput } from '@shared/drive';
 import {
   IpcChannel,
   type AppearanceApi,
   type ConnectionsApi,
   type DesktopApi,
+  type DriveApi,
   type SettingsApi,
   type WindowControls,
 } from '@shared/ipc';
@@ -71,6 +73,16 @@ const appearance = Object.freeze<AppearanceApi>({
   },
 });
 
+const drive = Object.freeze<DriveApi>({
+  listAccounts: () => ipcRenderer.invoke(IpcChannel.ListDriveAccounts),
+  listFolder: (input: DriveListInput) => {
+    return ipcRenderer.invoke(IpcChannel.ListDriveFolder, input);
+  },
+  searchFolder: (input: DriveSearchInput) => {
+    return ipcRenderer.invoke(IpcChannel.SearchDriveFolder, input);
+  },
+});
+
 const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
@@ -78,6 +90,7 @@ const desktopApi = Object.freeze<DesktopApi>({
   settings,
   appearance,
   connections,
+  drive,
   restartApp: () => {
     ipcRenderer.send(IpcChannel.RestartApp);
   },

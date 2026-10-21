@@ -3,6 +3,14 @@ import type {
   CreateSiteConnectionInput,
   SiteConnectionSummary,
 } from './connections';
+import type {
+  DriveAccount,
+  DriveListInput,
+  DriveListing,
+  DriveResult,
+  DriveSearchInput,
+  DriveSearchResult,
+} from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
 /**
@@ -28,6 +36,9 @@ export const IpcChannel = {
   LoginSiteConnection: 'connections:login',
   RemoveSiteConnection: 'connections:remove',
   ClearSiteConnections: 'connections:clear-all',
+  ListDriveAccounts: 'drive:list-accounts',
+  ListDriveFolder: 'drive:list-folder',
+  SearchDriveFolder: 'drive:search-folder',
 } as const;
 
 export interface AppInfo {
@@ -73,6 +84,14 @@ export interface ConnectionsApi {
   clearAll: () => Promise<number>;
 }
 
+export interface DriveApi {
+  listAccounts: () => Promise<DriveResult<readonly DriveAccount[]>>;
+  listFolder: (input: DriveListInput) => Promise<DriveResult<DriveListing>>;
+  searchFolder: (
+    input: DriveSearchInput,
+  ) => Promise<DriveResult<DriveSearchResult>>;
+}
+
 /**
  * The only API exposed to the renderer through `window.desktop`.
  * Add methods here first, then implement them in the preload and main process.
@@ -84,5 +103,6 @@ export interface DesktopApi {
   readonly settings: SettingsApi;
   readonly appearance: AppearanceApi;
   readonly connections: ConnectionsApi;
+  readonly drive: DriveApi;
   readonly restartApp: () => void;
 }

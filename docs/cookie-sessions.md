@@ -167,8 +167,10 @@ Chromium Partition  → Cookie 本体
    ```
 
 9. 数量为 0：不保存站点；新建流程会清理临时分区；
-10. 数量大于 0：调用 `session.cookies.flushStore()`，确保立即退出/重启也不会丢失 Cookie，然后写入连接元数据；
-11. 渲染层刷新状态，只显示数量。
+10. 115 站点会额外调用 `https://webapi.115.com/offine/downpath` 验证真实登录态；只有游客/风控 Cookie 时保存失败，并提示完成登录；
+11. 登录校验通过后，115 的会话型账号 Cookie 会被提升为 30 天持久 Cookie，再由 Chromium 加密持久化；
+12. 数量大于 0 且登录校验通过：调用 `session.cookies.flushStore()`，确保立即退出/重启也不会丢失 Cookie，然后写入连接元数据；
+13. 渲染层刷新状态，只显示数量。
 
 ![添加站点](cookie-dialog.png)
 

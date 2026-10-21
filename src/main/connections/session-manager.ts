@@ -24,6 +24,9 @@ import {
 import { getMainWindow } from '../window';
 import { getSitePartitionName } from './partition';
 import { applySiteSessionProfile } from './site-profile';
+import { is115Connection } from '../drive/detection';
+import { validateSiteLogin } from './login-validation';
+import { persist115SessionCookies } from './persist-cookies';
 
 const LOGIN_WINDOW_WIDTH = 1020;
 const LOGIN_WINDOW_HEIGHT = 760;
@@ -148,7 +151,16 @@ async function waitForLogin(
   applySiteSessionProfile(siteSession);
   await applyProxyToSession(siteSession, proxy);
 
-  const currentWindow = prepareLoginWindow(connection, partition);
+  // 115's account landing page can show a signed-in user before the drive
+  // session cookies are written. Open the storage URL directly so completing
+  // login lands on the drive and the authenticated cookie set is created.
+  const loginConnection = is115Connection(connection)
+    ? {
+        ...connection,
+        loginUrl: 'https://115.com/storage/allfiles?cid=0&mode=wangpan',
+      }
+    : connection;
+  const currentWindow = prepareLoginWindow(loginConnection, partition);
   loginWindow = currentWindow;
 
   try {
@@ -191,6 +203,12 @@ async function loginAndSummarize(
   if (cookieCount === 0) {
     throw new Error('未检测到 Cookie，站点连接未保存。');
   }
+
+  await validateSiteLogin(connection, siteSession);
+
+  // Some 115 auth cookies are session-only. Promote them before flushing so a
+  // valid login survives the next app restart.
+  await persist115SessionCookies(connection, siteSession);
 
   // Chromium batches cookie writes. Flush before reporting success so the
   // session survives an immediate app exit or restart.

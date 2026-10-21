@@ -1,70 +1,1359 @@
-import page from '../styles/page.module.css';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+  type UIEvent,
+} from 'react';
+import type {
+  DriveAccount,
+  DriveBreadcrumb,
+  DriveEntry,
+  DriveError,
+} from '@shared/drive';
+import { toErrorMessage } from '../lib/errors';
+import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
+
+interface DrivePageProps {
+  isActive: boolean;
+  onOpenSettings: () => void;
+}
+
+interface CachedFolder {
+  readonly breadcrumbs: readonly DriveBreadcrumb[];
+  readonly entries: readonly DriveEntry[];
+  readonly hasMore: boolean;
+  readonly total: number;
+  readonly cachedAt: number;
+}
+
+const PAGE_SIZE = 100;
+const FOLDER_CACHE_TTL_MS = 60_000;
+const ROOT_BREADCRUMB: DriveBreadcrumb = { id: '0', name: '根目录' };
+
+const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function formatDate(value: string | null): string {
+  if (!value) {
+    return '—';
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : DATE_FORMATTER.format(date).replaceAll('/', '-');
+}
+
+function formatSize(value: number | null): string {
+  if (value === null) {
+    return '—';
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let size = value / 1024;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size >= 10 ? Math.round(size) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function getEntryDescription(entry: DriveEntry): string {
+  if (entry.kind === 'folder') {
+    return '文件夹';
+  }
+
+  const extensionLabel = entry.extension
+    ? `${entry.extension.toUpperCase()} 文件`
+    : '文件';
+
+  if (getFileKind(entry.extension) !== 'video') {
+    return extensionLabel;
+  }
+
+  const duration = formatDuration(entry.durationSeconds);
+  const videoLabel = entry.extension
+    ? `${entry.extension.toUpperCase()} 视频`
+    : '视频';
+
+  return duration ? `${videoLabel} · ${duration}` : videoLabel;
+}
+
+function formatDuration(value: number | null): string | null {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.floor(value);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const paddedMinutes = String(minutes).padStart(2, '0');
+  const paddedSeconds = String(seconds).padStart(2, '0');
+
+  return hours > 0
+    ? `${hours}:${paddedMinutes}:${paddedSeconds}`
+    : `${minutes}:${paddedSeconds}`;
+}
+
+function FolderIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M2.7 5.3h5.1l1.5 1.8h8v8.1H2.7V5.3Z" />
+      <path d="M2.7 8.1h14.6" />
+    </svg>
+  );
+}
+
+type FileKind =
+  | 'archive'
+  | 'audio'
+  | 'code'
+  | 'image'
+  | 'package'
+  | 'pdf'
+  | 'sheet'
+  | 'slides'
+  | 'text'
+  | 'unknown'
+  | 'video';
+
+const FILE_KIND_BY_EXTENSION: Readonly<Record<string, FileKind>> = {
+  '7z': 'archive',
+  aac: 'audio',
+  apk: 'package',
+  appimage: 'package',
+  ass: 'text',
+  avi: 'video',
+  avif: 'image',
+  bmp: 'image',
+  bz2: 'archive',
+  c: 'code',
+  cpp: 'code',
+  css: 'code',
+  csv: 'sheet',
+  deb: 'package',
+  dmg: 'package',
+  doc: 'text',
+  docx: 'text',
+  epub: 'text',
+  exe: 'package',
+  flac: 'audio',
+  flv: 'video',
+  gif: 'image',
+  go: 'code',
+  gz: 'archive',
+  h: 'code',
+  heic: 'image',
+  html: 'code',
+  iso: 'package',
+  java: 'code',
+  jpeg: 'image',
+  jpg: 'image',
+  js: 'code',
+  json: 'code',
+  jsx: 'code',
+  key: 'slides',
+  m4a: 'audio',
+  m4v: 'video',
+  md: 'text',
+  mkv: 'video',
+  mov: 'video',
+  mp3: 'audio',
+  mp4: 'video',
+  msi: 'package',
+  ogg: 'audio',
+  odp: 'slides',
+  ods: 'sheet',
+  opus: 'audio',
+  pdf: 'pdf',
+  pkg: 'package',
+  png: 'image',
+  ppt: 'slides',
+  pptx: 'slides',
+  py: 'code',
+  rar: 'archive',
+  rs: 'code',
+  rtf: 'text',
+  sh: 'code',
+  srt: 'text',
+  svg: 'image',
+  tar: 'archive',
+  ts: 'code',
+  tsx: 'code',
+  txt: 'text',
+  wav: 'audio',
+  webm: 'video',
+  webp: 'image',
+  wmv: 'video',
+  xls: 'sheet',
+  xlsx: 'sheet',
+  xz: 'archive',
+  yaml: 'code',
+  yml: 'code',
+  zip: 'archive',
+};
+
+function getFileKind(extension: string | null): FileKind {
+  if (!extension) {
+    return 'unknown';
+  }
+
+  return FILE_KIND_BY_EXTENSION[extension.toLowerCase()] ?? 'unknown';
+}
+
+function getFileKindClass(kind: FileKind): string {
+  switch (kind) {
+    case 'archive':
+      return styles.fileArchive ?? '';
+    case 'audio':
+      return styles.fileAudio ?? '';
+    case 'code':
+      return styles.fileCode ?? '';
+    case 'image':
+      return styles.fileImage ?? '';
+    case 'package':
+      return styles.filePackage ?? '';
+    case 'pdf':
+      return styles.filePdf ?? '';
+    case 'sheet':
+      return styles.fileSheet ?? '';
+    case 'slides':
+      return styles.fileSlides ?? '';
+    case 'text':
+      return styles.fileText ?? '';
+    case 'video':
+      return styles.fileVideo ?? '';
+    default:
+      return '';
+  }
+}
+
+function ArchiveIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M4 3.5h12v13H4z" />
+      <path d="M8.5 3.5v2h3v2h-3v2h3v2h-3" />
+      <path d="M8.5 14h3" />
+    </svg>
+  );
+}
+
+function AudioIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M7.8 14V6.2l6-1.2v7.3" />
+      <circle cx="5.9" cy="14.1" r="2.1" />
+      <circle cx="11.9" cy="12.7" r="2.1" />
+    </svg>
+  );
+}
+
+function CodeIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="m7 6-3.5 4L7 14M13 6l3.5 4L13 14" />
+    </svg>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <rect height="13" rx="2" width="15" x="2.5" y="3.5" />
+      <circle cx="7" cy="8" r="1.4" />
+      <path d="m4.6 14.3 4.1-4 2.8 2.6 2.4-2.2 2.5 3.6" />
+    </svg>
+  );
+}
+
+function PackageIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="m3.4 6.4 6.6-3.2 6.6 3.2v7.2L10 16.8l-6.6-3.2V6.4Z" />
+      <path d="m3.4 6.4 6.6 3.2 6.6-3.2M10 9.6v7.2" />
+    </svg>
+  );
+}
+
+function PdfIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M5 2.8h6.2L15 6.7v10.5H5V2.8Z" />
+      <path d="M11.2 2.8v4h3.8" />
+      <path d="M7 11h1.2a1 1 0 1 1 0 2H7v-2Zm0 2v1.5" />
+      <path d="M10 11v3.5h.8a1.75 1.75 0 0 0 0-3.5H10Zm3.3 0h1.5M13.3 11v3.5M13.3 12.7h1.2" />
+    </svg>
+  );
+}
+
+function SheetIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <rect height="13" rx="1.5" width="14" x="3" y="3.5" />
+      <path d="M3 8h14M3 12h14M7.7 3.5v13M12.3 3.5v13" />
+    </svg>
+  );
+}
+
+function SlidesIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <rect height="11" rx="1.5" width="14" x="3" y="3.5" />
+      <path d="M5.7 7h6.2M5.7 9.7h4.3M5.7 12.4h7.8" />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M5 2.8h6.2L15 6.7v10.5H5V2.8Z" />
+      <path d="M11.2 2.8v4h3.8M7.4 10.6h5.2M7.4 13.3h5.2M7.4 16h3.2" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <rect height="12" rx="2.5" width="15" x="2.5" y="4" />
+      <path d="m8.5 7.4 4.2 2.6-4.2 2.6V7.4Z" />
+    </svg>
+  );
+}
+
+function FileTypeIcon({ kind }: { kind: FileKind }) {
+  switch (kind) {
+    case 'archive':
+      return <ArchiveIcon />;
+    case 'audio':
+      return <AudioIcon />;
+    case 'code':
+      return <CodeIcon />;
+    case 'image':
+      return <ImageIcon />;
+    case 'package':
+      return <PackageIcon />;
+    case 'pdf':
+      return <PdfIcon />;
+    case 'sheet':
+      return <SheetIcon />;
+    case 'slides':
+      return <SlidesIcon />;
+    case 'text':
+      return <TextIcon />;
+    case 'video':
+      return <VideoIcon />;
+    default:
+      return (
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+          <path d="M5 2.8h6.2L15 6.7v10.5H5V2.8Z" />
+          <path d="M11.2 2.8v4h3.8M7.4 11h5.2M7.4 14h4" />
+        </svg>
+      );
+  }
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <circle cx="8.8" cy="8.8" r="5.5" />
+      <path d="m13 13 3.2 3.2" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+      <path d="M13 8a5 5 0 1 1-1.5-3.6M13 3v3.2h-3.2" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+      <path d="m6 3.5 4.5 4.5L6 12.5" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="m3.2 9.3 6.8-5.5 6.8 5.5M5.2 8.6v7.6h9.6V8.6" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+      <rect height="5.6" rx="1.5" width="7.6" x="4.2" y="7.1" />
+      <path d="M5.8 7.1V5.6a2.2 2.2 0 0 1 4.4 0v1.5" />
+    </svg>
+  );
+}
 
 function CloudIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      focusable="false"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.4"
-      viewBox="0 0 24 24"
-    >
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
       <path d="M7.7 18.5h8.8a4.1 4.1 0 0 0 .5-8.16A5.7 5.7 0 0 0 6.1 9.1a4.75 4.75 0 0 0 1.6 9.4Z" />
       <path d="M12 9.8v5.7M9.7 13.2 12 15.5l2.3-2.3" />
     </svg>
   );
 }
 
-export function DrivePage() {
+function SkeletonRows() {
   return (
-    <main className={page.content}>
-      <section className={page.intro} aria-labelledby="drive-page-title">
-        <p className={page.eyebrow}>Cloud Drive / 即将上线</p>
-        <h1 id="drive-page-title">
-          把文件，放在
-          <br />
-          <span className={page.highlight}>触手可及</span>的地方。
-        </h1>
-        <p className={page.lede}>
-          网盘入口已经接入主导航。后续会在这里组织存储源、文件浏览、上传下载和传输队列，
-          文件操作继续由主进程安全处理。
-        </p>
-
-        <div className={page.stack} aria-label="网盘规划能力">
-          <span>文件浏览</span>
-          <span>上传下载</span>
-          <span>传输队列</span>
+    <div className={styles.skeletonList} aria-hidden="true">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div className={styles.skeletonRow} key={index}>
+          <span className={styles.skeletonIcon} />
+          <span className={styles.skeletonName} />
+          <span className={styles.skeletonMeta} />
         </div>
-      </section>
+      ))}
+    </div>
+  );
+}
 
-      <aside
-        className={styles.placeholderCard}
-        aria-labelledby="drive-card-title"
+interface StatePanelProps {
+  title: string;
+  description: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+  };
+}
+
+function StatePanel({ title, description, action }: StatePanelProps) {
+  return (
+    <div className={styles.statePanel}>
+      <span className={styles.stateIcon} aria-hidden="true">
+        <CloudIcon />
+      </span>
+      <h2>{title}</h2>
+      <p>{description}</p>
+      {action && (
+        <button
+          className={`${ui.button} ${ui.buttonPrimary}`}
+          disabled={action.disabled}
+          type="button"
+          onClick={action.onClick}
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+interface DriveWorkspaceContentProps {
+  readonly accountError: string;
+  readonly activeQuery: string | null;
+  readonly entries: readonly DriveEntry[];
+  readonly error: DriveError | null;
+  readonly fileListRef: RefObject<HTMLUListElement | null>;
+  readonly hasAccount: boolean;
+  readonly isAuthError: boolean;
+  readonly isLoading: boolean;
+  readonly isLoadingAccounts: boolean;
+  readonly isLoggingIn: boolean;
+  readonly isSearchActive: boolean;
+  readonly needsLogin: boolean;
+  readonly selectedId: string | null;
+  readonly onFileListScroll: (event: UIEvent<HTMLUListElement>) => void;
+  readonly onLogin: () => void;
+  readonly onOpenSettings: () => void;
+  readonly onOpenEntry: (entry: DriveEntry) => void;
+  readonly onRetryAccounts: () => void;
+  readonly onRetryLoad: () => void;
+  readonly onRetrySearch: () => void;
+  readonly onSelectEntry: (entry: DriveEntry) => void;
+}
+
+function DriveWorkspaceContent({
+  accountError,
+  activeQuery,
+  entries,
+  error,
+  fileListRef,
+  hasAccount,
+  isAuthError,
+  isLoading,
+  isLoadingAccounts,
+  isLoggingIn,
+  isSearchActive,
+  needsLogin,
+  selectedId,
+  onFileListScroll,
+  onLogin,
+  onOpenSettings,
+  onOpenEntry,
+  onRetryAccounts,
+  onRetryLoad,
+  onRetrySearch,
+  onSelectEntry,
+}: DriveWorkspaceContentProps) {
+  if (isLoadingAccounts) {
+    return <SkeletonRows />;
+  }
+
+  if (!hasAccount) {
+    if (accountError) {
+      return (
+        <StatePanel
+          description={accountError}
+          title="无法读取 115 账号"
+          action={{ label: '重试', onClick: onRetryAccounts }}
+        />
+      );
+    }
+
+    return (
+      <StatePanel
+        description="请先在设置中添加并登录 115 网盘。登录地址需要使用 https://115.com/。"
+        title="未检测到 115 账号"
+        action={{ label: '前往设置', onClick: onOpenSettings }}
+      />
+    );
+  }
+
+  if (needsLogin) {
+    return (
+      <StatePanel
+        description={
+          accountError ||
+          (isAuthError
+            ? 'Cookie 可能已过期，请重新登录后继续浏览。'
+            : '此站点连接还没有保存 Cookie，请先完成登录。')
+        }
+        title={isAuthError ? '115 登录已失效' : '115 尚未登录'}
+        action={{
+          label: isLoggingIn ? '等待登录窗口…' : '登录 115',
+          onClick: onLogin,
+          disabled: isLoggingIn,
+        }}
+      />
+    );
+  }
+
+  if (accountError) {
+    return (
+      <StatePanel
+        description={accountError}
+        title="115 账号不可用"
+        action={{ label: '重试', onClick: onRetryAccounts }}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return <SkeletonRows />;
+  }
+
+  if (error) {
+    if (isAuthError) {
+      return (
+        <StatePanel
+          description={error.message}
+          title="115 登录已失效"
+          action={{
+            label: isLoggingIn ? '等待登录窗口…' : '重新登录',
+            onClick: onLogin,
+            disabled: isLoggingIn,
+          }}
+        />
+      );
+    }
+
+    return (
+      <StatePanel
+        description={error.message}
+        title="无法读取 115 目录"
+        action={{
+          label: '重试',
+          onClick: isSearchActive ? onRetrySearch : onRetryLoad,
+        }}
+      />
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <StatePanel
+        description={
+          isSearchActive
+            ? `“${activeQuery}”在当前目录中没有匹配的文件或文件夹。`
+            : '此目录下还没有文件或文件夹。'
+        }
+        title={isSearchActive ? '没有找到匹配项' : '这个文件夹是空的'}
+      />
+    );
+  }
+
+  return (
+    <div className={styles.listView}>
+      <div className={styles.tableHead}>
+        <span>名称</span>
+        <span>大小</span>
+        <span>修改时间</span>
+        <span />
+      </div>
+
+      <ul
+        className={styles.fileList}
+        ref={fileListRef}
+        onScroll={onFileListScroll}
       >
-        <div className={styles.placeholderTop}>
-          <span className={styles.runtimeKicker}>Workspace</span>
-          <span className={styles.placeholderBadge}>
-            <span aria-hidden="true" />
-            准备中
-          </span>
+        {entries.map((entry) => {
+          const isSelected = selectedId === entry.id;
+          const isFolder = entry.kind === 'folder';
+          const fileKind = isFolder ? null : getFileKind(entry.extension);
+          const fileKindClass = fileKind ? getFileKindClass(fileKind) : '';
+
+          return (
+            <li className={styles.fileItem} key={`${entry.kind}-${entry.id}`}>
+              <button
+                aria-label={`${entry.name}，${getEntryDescription(entry)}`}
+                className={`${styles.fileRow}${isSelected ? ` ${styles.selected}` : ''}`}
+                type="button"
+                onClick={() => {
+                  onSelectEntry(entry);
+                }}
+                onDoubleClick={() => {
+                  onOpenEntry(entry);
+                }}
+                onKeyDown={(event) => {
+                  if (isFolder && event.key === 'Enter') {
+                    event.preventDefault();
+                    onOpenEntry(entry);
+                  }
+                }}
+              >
+                <span className={styles.fileNameCell}>
+                  <span
+                    className={`${styles.fileIcon} ${
+                      isFolder
+                        ? styles.folderIcon
+                        : `${styles.documentIcon}${
+                            fileKindClass ? ` ${fileKindClass}` : ''
+                          }`
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {isFolder ? (
+                      <FolderIcon />
+                    ) : (
+                      <FileTypeIcon kind={fileKind ?? 'unknown'} />
+                    )}
+                  </span>
+                  <span className={styles.fileCopy}>
+                    <span className={styles.fileName} title={entry.name}>
+                      {entry.name}
+                    </span>
+                    <span className={styles.fileDescription}>
+                      {getEntryDescription(entry)}
+                    </span>
+                  </span>
+                </span>
+                <span className={styles.fileSize}>
+                  {isFolder ? '—' : formatSize(entry.size)}
+                </span>
+                <span className={styles.fileDate}>
+                  {formatDate(entry.modifiedAt)}
+                </span>
+                <span className={styles.fileChevron} aria-hidden="true">
+                  {isFolder && <ChevronIcon />}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
+  const [account, setAccount] = useState<DriveAccount | null>(null);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [accountError, setAccountError] = useState('');
+  const [breadcrumbs, setBreadcrumbs] = useState<readonly DriveBreadcrumb[]>([
+    ROOT_BREADCRUMB,
+  ]);
+  const [entries, setEntries] = useState<readonly DriveEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<DriveError | null>(null);
+  const [query, setQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const requestIdRef = useRef(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const fileListRef = useRef<HTMLUListElement>(null);
+  const fileListScrollTopRef = useRef(0);
+  const folderCacheRef = useRef(new Map<string, CachedFolder>());
+
+  const currentBreadcrumb =
+    breadcrumbs[breadcrumbs.length - 1] ?? ROOT_BREADCRUMB;
+  const currentFolderId = currentBreadcrumb.id;
+  const currentFolderName = currentBreadcrumb.name;
+  const isSearchActive = activeQuery !== null;
+  const isAuthError = error?.code === 'auth_required';
+  const needsLogin =
+    Boolean(account) &&
+    (account?.status === 'empty' || isAuthError) &&
+    !isLoading;
+
+  const loadFolder = useCallback(
+    async (
+      connectionId: string,
+      folderId: string,
+      offset = 0,
+      append = false,
+      force = false,
+    ) => {
+      const requestId = ++requestIdRef.current;
+      const cacheKey = `${connectionId}:${folderId}`;
+      const cached =
+        !append && !force ? folderCacheRef.current.get(cacheKey) : undefined;
+
+      if (!append) {
+        fileListScrollTopRef.current = 0;
+
+        if (fileListRef.current) {
+          fileListRef.current.scrollTop = 0;
+        }
+      }
+
+      if (append) {
+        setIsLoadingMore(true);
+      } else if (cached) {
+        setEntries(cached.entries);
+        setTotal(cached.total);
+        setHasMore(cached.hasMore);
+        setBreadcrumbs(cached.breadcrumbs);
+        setSelectedId(null);
+        setActiveQuery(null);
+        setError(null);
+        setIsLoading(false);
+
+        if (Date.now() - cached.cachedAt < FOLDER_CACHE_TTL_MS) {
+          setIsLoadingMore(false);
+          return;
+        }
+      } else {
+        setIsLoading(true);
+        setIsLoadingMore(false);
+        setEntries([]);
+        setSelectedId(null);
+      }
+
+      setError(null);
+
+      try {
+        const result = await window.desktop.drive.listFolder({
+          connectionId,
+          folderId,
+          offset,
+          limit: PAGE_SIZE,
+        });
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        if (!result.ok) {
+          if (!cached || result.error.code === 'auth_required') {
+            setError(result.error);
+          }
+
+          if (!cached) {
+            setHasMore(false);
+          }
+
+          return;
+        }
+
+        setEntries((current) =>
+          append ? [...current, ...result.data.entries] : result.data.entries,
+        );
+        setTotal(result.data.total);
+        setHasMore(result.data.hasMore);
+
+        if (append) {
+          const existing = folderCacheRef.current.get(cacheKey);
+
+          if (existing) {
+            folderCacheRef.current.set(cacheKey, {
+              ...existing,
+              entries: [...existing.entries, ...result.data.entries],
+              total: result.data.total,
+              hasMore: result.data.hasMore,
+              cachedAt: Date.now(),
+            });
+          }
+        } else {
+          setBreadcrumbs(result.data.breadcrumbs);
+          setActiveQuery(null);
+          folderCacheRef.current.set(cacheKey, {
+            entries: result.data.entries,
+            total: result.data.total,
+            hasMore: result.data.hasMore,
+            breadcrumbs: result.data.breadcrumbs,
+            cachedAt: Date.now(),
+          });
+        }
+      } catch (loadFailure: unknown) {
+        if (requestId === requestIdRef.current && !cached) {
+          setError({
+            code: 'api',
+            message: toErrorMessage(
+              loadFailure,
+              '读取 115 目录失败，请稍后重试。',
+            ),
+          });
+        }
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const loadAccounts = useCallback(async () => {
+    setIsLoadingAccounts(true);
+    setAccountError('');
+    setError(null);
+
+    try {
+      const result = await window.desktop.drive.listAccounts();
+
+      if (!result.ok) {
+        setAccountError(result.error.message);
+        setAccount(null);
+        return;
+      }
+
+      const firstAccount = result.data[0] ?? null;
+      setAccount(firstAccount);
+
+      if (!firstAccount) {
+        return;
+      }
+
+      if (firstAccount.status === 'connected') {
+        await loadFolder(firstAccount.connectionId, '0');
+      } else {
+        setBreadcrumbs([ROOT_BREADCRUMB]);
+        setEntries([]);
+        setTotal(0);
+        setHasMore(false);
+      }
+    } catch (loadFailure: unknown) {
+      setAccountError(
+        toErrorMessage(loadFailure, '读取 115 账号失败，请稍后重试。'),
+      );
+      setAccount(null);
+    } finally {
+      setIsLoadingAccounts(false);
+    }
+  }, [loadFolder]);
+
+  useEffect(() => {
+    void loadAccounts();
+  }, [loadAccounts]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    const handleShortcut = (event: globalThis.KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleShortcut);
+
+    return () => {
+      window.removeEventListener('keydown', handleShortcut);
+    };
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      if (fileListRef.current) {
+        fileListRef.current.scrollTop = fileListScrollTopRef.current;
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [isActive]);
+
+  const handleSearch = async (searchQuery: string) => {
+    if (!account || !searchQuery.trim()) {
+      return;
+    }
+
+    const normalizedQuery = searchQuery.trim();
+    const requestId = ++requestIdRef.current;
+
+    setQuery(normalizedQuery);
+    setActiveQuery(normalizedQuery);
+    setIsLoading(true);
+    setIsLoadingMore(false);
+    setError(null);
+    setEntries([]);
+    setSelectedId(null);
+    fileListScrollTopRef.current = 0;
+
+    if (fileListRef.current) {
+      fileListRef.current.scrollTop = 0;
+    }
+
+    try {
+      const result = await window.desktop.drive.searchFolder({
+        connectionId: account.connectionId,
+        folderId: currentFolderId,
+        query: normalizedQuery,
+        offset: 0,
+        limit: PAGE_SIZE,
+      });
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      if (!result.ok) {
+        setError(result.error);
+        setHasMore(false);
+        return;
+      }
+
+      setEntries(result.data.entries);
+      setTotal(result.data.total);
+      setHasMore(result.data.hasMore);
+    } catch (searchFailure: unknown) {
+      if (requestId === requestIdRef.current) {
+        setError({
+          code: 'api',
+          message: toErrorMessage(
+            searchFailure,
+            '搜索 115 目录失败，请稍后重试。',
+          ),
+        });
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!query.trim()) {
+      if (activeQuery) {
+        setQuery('');
+        setActiveQuery(null);
+        if (account) {
+          void loadFolder(account.connectionId, currentFolderId);
+        }
+      }
+      return;
+    }
+
+    void handleSearch(query);
+  };
+
+  const clearSearch = () => {
+    setQuery('');
+    setActiveQuery(null);
+    setError(null);
+
+    if (account) {
+      void loadFolder(account.connectionId, currentFolderId);
+    }
+  };
+
+  const navigateToFolder = (folderId: string) => {
+    if (!account) {
+      return;
+    }
+
+    setQuery('');
+    setActiveQuery(null);
+    void loadFolder(account.connectionId, folderId);
+  };
+
+  const handleBreadcrumb = (breadcrumb: DriveBreadcrumb) => {
+    if (breadcrumb.id === currentFolderId) {
+      return;
+    }
+
+    navigateToFolder(breadcrumb.id);
+  };
+
+  const handleRefresh = () => {
+    if (!account) {
+      return;
+    }
+
+    if (activeQuery) {
+      void handleSearch(activeQuery);
+    } else {
+      void loadFolder(account.connectionId, currentFolderId, 0, false, true);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!account || isLoading || isLoadingMore || !hasMore) {
+      return;
+    }
+
+    if (activeQuery) {
+      const requestId = ++requestIdRef.current;
+      setIsLoadingMore(true);
+      setError(null);
+
+      void window.desktop.drive
+        .searchFolder({
+          connectionId: account.connectionId,
+          folderId: currentFolderId,
+          query: activeQuery,
+          offset: entries.length,
+          limit: PAGE_SIZE,
+        })
+        .then((result) => {
+          if (requestId !== requestIdRef.current) {
+            return;
+          }
+
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+
+          setEntries((current) => [...current, ...result.data.entries]);
+          setTotal(result.data.total);
+          setHasMore(result.data.hasMore);
+        })
+        .catch((loadFailure: unknown) => {
+          if (requestId === requestIdRef.current) {
+            setError({
+              code: 'api',
+              message: toErrorMessage(
+                loadFailure,
+                '加载更多文件失败，请稍后重试。',
+              ),
+            });
+          }
+        })
+        .finally(() => {
+          if (requestId === requestIdRef.current) {
+            setIsLoadingMore(false);
+          }
+        });
+
+      return;
+    }
+
+    void loadFolder(
+      account.connectionId,
+      currentFolderId,
+      entries.length,
+      true,
+    );
+  };
+
+  const handleLogin = async () => {
+    if (!account || isLoggingIn) {
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setAccountError('');
+
+    try {
+      const updated = await window.desktop.connections.login(
+        account.connectionId,
+      );
+
+      setAccount({
+        ...account,
+        name: updated.name,
+        loginUrl: updated.loginUrl,
+        status: updated.status,
+        cookieCount: updated.cookieCount,
+      });
+      setBreadcrumbs([ROOT_BREADCRUMB]);
+      setActiveQuery(null);
+      setQuery('');
+      folderCacheRef.current.clear();
+      await loadFolder(account.connectionId, '0', 0, false, true);
+    } catch (loginFailure: unknown) {
+      setAccountError(
+        toErrorMessage(loginFailure, '115 登录失败，请稍后重试。'),
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleEntryClick = (entry: DriveEntry) => {
+    setSelectedId(entry.id);
+  };
+
+  const handleEntryDoubleClick = (entry: DriveEntry) => {
+    if (entry.kind === 'folder') {
+      navigateToFolder(entry.id);
+    }
+  };
+
+  const statusLabel = isLoadingAccounts
+    ? '读取中…'
+    : !account
+      ? '未连接'
+      : account.status === 'empty'
+        ? '待登录'
+        : isAuthError
+          ? '登录已失效'
+          : '已连接';
+
+  return (
+    <main className={styles.drivePage}>
+      <header className={styles.pageHeader}>
+        <div className={styles.identity}>
+          <p className={styles.eyebrow}>115 / Cloud Drive</p>
+          <div className={styles.titleRow}>
+            <span className={styles.providerBadge} aria-hidden="true">
+              115
+            </span>
+            <h1>115 网盘</h1>
+            <span
+              className={`${styles.statusPill}${isAuthError ? ` ${styles.statusError}` : ''}${account?.status === 'empty' ? ` ${styles.statusEmpty}` : ''}`}
+            >
+              <span className={styles.statusDot} aria-hidden="true" />
+              {statusLabel}
+            </span>
+            <span className={styles.readonlyPill}>
+              <LockIcon />
+              只读
+            </span>
+          </div>
         </div>
 
-        <span className={styles.placeholderMark} aria-hidden="true">
-          <CloudIcon />
-        </span>
+        <div className={styles.headerActions}>
+          <form
+            aria-label="115 网盘搜索"
+            className={styles.searchForm}
+            onSubmit={handleSearchSubmit}
+          >
+            <button
+              aria-label="搜索"
+              className={styles.searchSubmit}
+              disabled={
+                !account || isLoadingAccounts || needsLogin || isAuthError
+              }
+              title="搜索当前目录"
+              type="submit"
+            >
+              <SearchIcon />
+            </button>
+            <input
+              aria-keyshortcuts="Control+K"
+              aria-label="搜索当前目录"
+              disabled={
+                !account || isLoadingAccounts || needsLogin || isAuthError
+              }
+              placeholder="搜索当前目录"
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
+            />
+            {query || isSearchActive ? (
+              <button
+                aria-label="清除搜索"
+                className={styles.clearSearch}
+                type="button"
+                onClick={clearSearch}
+              >
+                ×
+              </button>
+            ) : null}
+            <kbd>Ctrl K</kbd>
+          </form>
+          <button
+            className={`${ui.button} ${ui.buttonSecondary} ${styles.refreshButton}`}
+            disabled={!account || isLoading || needsLogin || isAuthError}
+            type="button"
+            onClick={handleRefresh}
+          >
+            <RefreshIcon />
+            刷新
+          </button>
+        </div>
+      </header>
 
-        <h2 id="drive-card-title">网盘工作区正在搭建</h2>
-        <p>
-          菜单、页面容器和响应式布局已经就绪。下一步可以从文件列表和一个存储源开始。
-        </p>
+      <section className={styles.workspace} aria-label="115 网盘文件">
+        <header className={styles.toolbar}>
+          <nav aria-label="目录路径" className={styles.breadcrumbs}>
+            {breadcrumbs.map((breadcrumb, index) => {
+              const isCurrent = breadcrumb.id === currentFolderId;
 
-        <div className={styles.placeholderDivider} />
-        <p className={styles.placeholderFootnote}>尚未连接存储源</p>
-      </aside>
+              return (
+                <span className={styles.breadcrumbItem} key={breadcrumb.id}>
+                  {index > 0 && (
+                    <span
+                      className={styles.breadcrumbSeparator}
+                      aria-hidden="true"
+                    >
+                      /
+                    </span>
+                  )}
+                  <button
+                    className={`${styles.breadcrumb}${
+                      isCurrent ? ` ${styles.breadcrumbCurrent}` : ''
+                    }`}
+                    disabled={isCurrent}
+                    type="button"
+                    onClick={() => {
+                      handleBreadcrumb(breadcrumb);
+                    }}
+                  >
+                    {index === 0 && (
+                      <span className={styles.homeIcon} aria-hidden="true">
+                        <HomeIcon />
+                      </span>
+                    )}
+                    {breadcrumb.name}
+                  </button>
+                </span>
+              );
+            })}
+            <span className={styles.itemCount}>
+              {isSearchActive ? `${total} 个结果` : `${total} 项`}
+            </span>
+          </nav>
+
+          {isSearchActive ? (
+            <span className={styles.searchSummary}>
+              在“{currentFolderName}”中搜索“{activeQuery}”
+            </span>
+          ) : (
+            <span className={styles.openHint}>双击文件夹进入下一层</span>
+          )}
+        </header>
+
+        <DriveWorkspaceContent
+          accountError={accountError}
+          activeQuery={activeQuery}
+          entries={entries}
+          error={error}
+          fileListRef={fileListRef}
+          hasAccount={Boolean(account)}
+          isAuthError={isAuthError}
+          isLoading={isLoading}
+          isLoadingAccounts={isLoadingAccounts}
+          isLoggingIn={isLoggingIn}
+          isSearchActive={isSearchActive}
+          needsLogin={needsLogin}
+          selectedId={selectedId}
+          onFileListScroll={(event) => {
+            fileListScrollTopRef.current = event.currentTarget.scrollTop;
+          }}
+          onLogin={() => {
+            void handleLogin();
+          }}
+          onOpenEntry={handleEntryDoubleClick}
+          onOpenSettings={onOpenSettings}
+          onRetryAccounts={() => {
+            void loadAccounts();
+          }}
+          onRetryLoad={() => {
+            if (account) {
+              void loadFolder(
+                account.connectionId,
+                currentFolderId,
+                0,
+                false,
+                true,
+              );
+            }
+          }}
+          onRetrySearch={() => {
+            void handleSearch(activeQuery ?? '');
+          }}
+          onSelectEntry={handleEntryClick}
+        />
+
+        {account &&
+          !isAuthError &&
+          !needsLogin &&
+          !accountError &&
+          !isLoading &&
+          !error && (
+            <footer className={styles.workspaceFooter}>
+              <span>
+                <strong>{isSearchActive ? '搜索结果' : '共'}</strong>{' '}
+                {isSearchActive ? `${total} 项 · ` : `${total} 项 · `}
+                只读浏览
+              </span>
+              {hasMore && (
+                <button
+                  className={`${ui.button} ${ui.buttonSecondary} ${styles.loadMore}`}
+                  disabled={isLoadingMore}
+                  type="button"
+                  onClick={handleLoadMore}
+                >
+                  {isLoadingMore ? '加载中…' : '加载更多'}
+                </button>
+              )}
+            </footer>
+          )}
+      </section>
     </main>
   );
 }

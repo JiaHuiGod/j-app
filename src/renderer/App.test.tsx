@@ -2,11 +2,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppearanceState } from '@shared/appearance';
 import type { SiteConnectionSummary } from '@shared/connections';
+import type { DriveAccount, DriveListing } from '@shared/drive';
 import type {
   AppearanceApi,
   AppInfo,
   ConnectionsApi,
   DesktopApi,
+  DriveApi,
   SettingsApi,
 } from '@shared/ipc';
 import type { ProxySettings } from '@shared/settings';
@@ -55,6 +57,72 @@ const presetConnection: SiteConnectionSummary = {
   status: 'empty',
 };
 
+const driveAccount: DriveAccount = {
+  connectionId: '0f2a63a7-0a9f-4b0a-9d0b-6b8e1c1a2f5d',
+  name: '115 网盘',
+  loginUrl: 'https://115.com/storage/allfiles?cid=0&mode=wangpan',
+  provider: '115',
+  status: 'connected',
+  cookieCount: 3,
+};
+
+const driveRootListing: DriveListing = {
+  accountId: driveAccount.connectionId,
+  folderId: '0',
+  breadcrumbs: [{ id: '0', name: '根目录' }],
+  entries: [
+    {
+      id: '10',
+      parentId: '0',
+      name: '电影',
+      kind: 'folder',
+      size: null,
+      modifiedAt: '2026-10-21T10:00:00.000Z',
+      extension: null,
+      durationSeconds: null,
+    },
+    {
+      id: '20',
+      parentId: '0',
+      name: 'readme.txt',
+      kind: 'file',
+      size: 1024,
+      modifiedAt: '2026-10-21T09:00:00.000Z',
+      extension: 'txt',
+      durationSeconds: null,
+    },
+  ],
+  offset: 0,
+  limit: 100,
+  total: 2,
+  hasMore: false,
+};
+
+const driveChildListing: DriveListing = {
+  accountId: driveAccount.connectionId,
+  folderId: '10',
+  breadcrumbs: [
+    { id: '0', name: '根目录' },
+    { id: '10', name: '电影' },
+  ],
+  entries: [
+    {
+      id: '11',
+      parentId: '10',
+      name: '电影里的文件.txt',
+      kind: 'file',
+      size: 2048,
+      modifiedAt: '2026-10-21T11:00:00.000Z',
+      extension: 'txt',
+      durationSeconds: null,
+    },
+  ],
+  offset: 0,
+  limit: 100,
+  total: 1,
+  hasMore: false,
+};
+
 let getAppInfo: ReturnType<typeof vi.fn<() => Promise<AppInfo>>>;
 let getProxy: ReturnType<typeof vi.fn<() => Promise<ProxySettings>>>;
 let saveProxy: ReturnType<
@@ -70,6 +138,9 @@ let createPresetConnection: ReturnType<
 let loginConnection: ReturnType<typeof vi.fn<ConnectionsApi['login']>>;
 let removeConnection: ReturnType<typeof vi.fn<ConnectionsApi['remove']>>;
 let clearAllConnections: ReturnType<typeof vi.fn<ConnectionsApi['clearAll']>>;
+let listDriveAccounts: ReturnType<typeof vi.fn<DriveApi['listAccounts']>>;
+let listDriveFolder: ReturnType<typeof vi.fn<DriveApi['listFolder']>>;
+let searchDriveFolder: ReturnType<typeof vi.fn<DriveApi['searchFolder']>>;
 let getAppearance: ReturnType<typeof vi.fn<AppearanceApi['get']>>;
 let setAppearanceTheme: ReturnType<typeof vi.fn<AppearanceApi['setTheme']>>;
 
@@ -99,6 +170,23 @@ beforeEach(() => {
   clearAllConnections = vi
     .fn<ConnectionsApi['clearAll']>()
     .mockResolvedValue(1);
+  listDriveAccounts = vi
+    .fn<DriveApi['listAccounts']>()
+    .mockResolvedValue({ ok: true, data: [] });
+  listDriveFolder = vi
+    .fn<DriveApi['listFolder']>()
+    .mockResolvedValue({ ok: true, data: driveRootListing });
+  searchDriveFolder = vi.fn<DriveApi['searchFolder']>().mockResolvedValue({
+    ok: true,
+    data: {
+      query: '',
+      entries: [],
+      offset: 0,
+      limit: 100,
+      total: 0,
+      hasMore: false,
+    },
+  });
   getAppearance = vi
     .fn<AppearanceApi['get']>()
     .mockResolvedValue(appearanceState);
@@ -126,6 +214,11 @@ beforeEach(() => {
     remove: removeConnection,
     clearAll: clearAllConnections,
   };
+  const drive: DriveApi = {
+    listAccounts: listDriveAccounts,
+    listFolder: listDriveFolder,
+    searchFolder: searchDriveFolder,
+  };
   const appearance: AppearanceApi = {
     get: getAppearance,
     setTheme: setAppearanceTheme,
@@ -146,6 +239,7 @@ beforeEach(() => {
     settings,
     appearance,
     connections,
+    drive,
     restartApp,
   };
 
@@ -213,12 +307,12 @@ describe('App', () => {
     fireEvent.click(driveButton);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: /把文件/ }),
+      await screen.findByRole('heading', { level: 1, name: '115 网盘' }),
     ).toBeDefined();
-    expect(screen.getByText('网盘工作区正在搭建')).toBeDefined();
+    expect(await screen.findByText('未检测到 115 账号')).toBeDefined();
     expect(driveButton.getAttribute('aria-current')).toBe('page');
 
-    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    fireEvent.click(screen.getByRole('button', { name: '前往设置' }));
 
     expect(
       await screen.findByRole('heading', {
@@ -234,6 +328,179 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: /构建可靠的桌面应用/ }),
     ).toBeDefined();
+  });
+
+  it('lists 115 files and opens a folder on double click', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockImplementation(async (input) => ({
+      ok: true,
+      data: input.folderId === '10' ? driveChildListing : driveRootListing,
+    }));
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    expect(await screen.findByText('电影')).toBeDefined();
+    expect(listDriveFolder).toHaveBeenNthCalledWith(1, {
+      connectionId: driveAccount.connectionId,
+      folderId: '0',
+      offset: 0,
+      limit: 100,
+    });
+
+    fireEvent.doubleClick(screen.getByText('电影'));
+
+    expect(await screen.findByText('电影里的文件.txt')).toBeDefined();
+    expect(listDriveFolder).toHaveBeenNthCalledWith(2, {
+      connectionId: driveAccount.connectionId,
+      folderId: '10',
+      offset: 0,
+      limit: 100,
+    });
+  });
+
+  it('keeps the current folder when leaving and returning to drive', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockImplementation(async (input) => ({
+      ok: true,
+      data: input.folderId === '10' ? driveChildListing : driveRootListing,
+    }));
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.doubleClick(screen.getByText('电影'));
+    await screen.findByText('电影里的文件.txt');
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByRole('heading', { level: 1, name: /设置/ });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: '115 网盘' }),
+    ).toBeDefined();
+    expect(screen.getByText('电影里的文件.txt')).toBeDefined();
+    expect(listDriveFolder).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses a recently visited folder from memory', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockImplementation(async (input) => ({
+      ok: true,
+      data: input.folderId === '10' ? driveChildListing : driveRootListing,
+    }));
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.doubleClick(screen.getByText('电影'));
+    await screen.findByText('电影里的文件.txt');
+
+    fireEvent.click(screen.getByRole('button', { name: '根目录' }));
+
+    expect(await screen.findByText('电影')).toBeDefined();
+    expect(listDriveFolder).toHaveBeenCalledTimes(2);
+  });
+
+  it('searches only inside the current 115 folder', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    searchDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        query: '季度',
+        entries: [
+          {
+            id: '30',
+            parentId: '0',
+            name: '季度总结.md',
+            kind: 'file',
+            size: 4096,
+            modifiedAt: '2026-10-21T12:00:00.000Z',
+            extension: 'md',
+            durationSeconds: null,
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+
+    fireEvent.change(screen.getByLabelText('搜索当前目录'), {
+      target: { value: '季度' },
+    });
+    fireEvent.submit(screen.getByRole('form', { name: '115 网盘搜索' }));
+
+    expect(await screen.findByText('季度总结.md')).toBeDefined();
+    expect(searchDriveFolder).toHaveBeenCalledWith({
+      connectionId: driveAccount.connectionId,
+      folderId: '0',
+      query: '季度',
+      offset: 0,
+      limit: 100,
+    });
+    expect(await screen.findByText(/在“根目录”中搜索“季度”/)).toBeDefined();
+  });
+
+  it('shows a relogin action when the 115 session has expired', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'auth_required',
+        message: '115 登录已失效，请重新登录。',
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+
+    expect(
+      await screen.findByRole('heading', { name: '115 登录已失效' }),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: '登录 115' }));
+
+    expect(loginConnection).toHaveBeenCalledWith(driveAccount.connectionId);
   });
 
   it('adds a site connection from the settings page', async () => {

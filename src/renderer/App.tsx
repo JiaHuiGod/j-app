@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
   const [activePage, setActivePage] = useState<AppPage>('overview');
+  const [hasVisitedDrive, setHasVisitedDrive] = useState(false);
   const [isProxyDialogOpen, setIsProxyDialogOpen] = useState(false);
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -35,6 +36,10 @@ function App() {
   const handleNavigate = (page: AppPage) => {
     setActivePage(page);
 
+    if (page === 'drive') {
+      setHasVisitedDrive(true);
+    }
+
     if (appShellRef.current) {
       appShellRef.current.scrollTop = 0;
     }
@@ -57,16 +62,23 @@ function App() {
 
       <div className="app-shell" ref={appShellRef}>
         {activePage === 'overview' && <OverviewPage />}
-        {activePage === 'drive' && <DrivePage />}
+
+        {hasVisitedDrive && (
+          <div className="page-slot" hidden={activePage !== 'drive'}>
+            <DrivePage
+              isActive={activePage === 'drive'}
+              onOpenSettings={() => {
+                handleNavigate('settings');
+              }}
+            />
+          </div>
+        )}
+
         {activePage === 'settings' && <SettingsPage />}
 
         <footer className="app-footer">
-          <span>
-            J App <span className="slash">/</span> Scaffolded for production
-          </span>
-          <span className="footer-path">
-            src/main · src/preload · src/renderer
-          </span>
+          <span>J App · 本地优先</span>
+          <span className="footer-note">配置与登录数据保存在本机</span>
         </footer>
       </div>
 

@@ -9,6 +9,7 @@ import {
   loginSiteConnection,
   removeSiteConnectionData,
 } from './connections/session-manager';
+import { registerDriveIpcHandlers } from './drive/ipc';
 import { testProxySettings } from './network/proxy';
 import { getProxySettings, saveProxySettings } from './settings/store';
 
@@ -68,6 +69,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannel.ClearSiteConnections, () =>
     clearAllSiteConnectionData(),
   );
+  registerDriveIpcHandlers();
 
   ipcMain.on(IpcChannel.WindowMinimize, (event) => {
     getSenderWindow(event.sender)?.minimize();
