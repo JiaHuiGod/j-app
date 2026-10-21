@@ -139,3 +139,53 @@ export interface DriveUploadProgress {
   readonly status: 'uploading' | 'success' | 'failed';
   readonly error?: string;
 }
+
+export type DriveOfflineTaskStatus =
+  | 'downloading'
+  | 'failed'
+  | 'finished'
+  | 'paused'
+  | 'pending'
+  | 'unknown';
+
+export interface DriveOfflineTask {
+  readonly id: string;
+  readonly name: string;
+  readonly size: number | null;
+  readonly progress: number;
+  readonly rate: number;
+  readonly status: DriveOfflineTaskStatus;
+  readonly statusText: string;
+  readonly targetFolderId: string | null;
+  readonly addedAt: string | null;
+  readonly sourceUrl: string;
+}
+
+export interface DriveOfflineTaskList {
+  readonly tasks: readonly DriveOfflineTask[];
+  readonly page: number;
+  readonly pageCount: number;
+  readonly total: number;
+}
+
+export interface DriveOfflineListInput {
+  readonly connectionId: string;
+  readonly page?: number;
+}
+
+export interface DriveOfflineAddInput {
+  readonly connectionId: string;
+  readonly folderId: string;
+  readonly urls: readonly string[];
+}
+
+export interface DriveOfflineAddError {
+  readonly url: string;
+  readonly message: string;
+}
+
+export interface DriveOfflineAddResult {
+  readonly successCount: number;
+  readonly failedCount: number;
+  readonly errors: readonly DriveOfflineAddError[];
+}

@@ -150,15 +150,35 @@ export async function fetch115Json(
   }
 
   const record = body as Record<string, unknown>;
-  const errorMessage =
-    typeof record.error === 'string' ? record.error.trim() : '';
+  const errorMessage = [
+    record.error,
+    record.error_msg,
+    record.errmsg,
+    record.message,
+    record.msg,
+  ].find(
+    (value): value is string =>
+      typeof value === 'string' && value.trim().length > 0,
+  );
+  const errorCode = [record.errcode, record.errno].find(
+    (value) =>
+      (typeof value === 'string' || typeof value === 'number') &&
+      String(value) !== '' &&
+      String(value) !== '0',
+  );
 
   if (record.state === false) {
-    if (errorMessage.includes('登录')) {
+    if (errorMessage?.includes('登录')) {
       return failure('auth_required', '115 登录已失效，请重新登录。');
     }
 
-    return failure('api', errorMessage || '115 接口返回失败，请稍后重试。');
+    return failure(
+      'api',
+      errorMessage?.trim() ||
+        (errorCode
+          ? `115 接口返回失败（错误码 ${String(errorCode)}）。`
+          : '115 接口返回失败，请稍后重试。'),
+    );
   }
 
   return { ok: true, data: record };

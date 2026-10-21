@@ -11,6 +11,8 @@ import type {
   DriveDeleteInput,
   DriveListInput,
   DriveMoveInput,
+  DriveOfflineAddInput,
+  DriveOfflineListInput,
   DriveRenameInput,
   DriveSearchInput,
   DriveUploadInput,
@@ -124,6 +126,12 @@ const drive = Object.freeze<DriveApi>({
       ...input,
       filePaths,
     });
+  },
+  listOfflineTasks: (input: DriveOfflineListInput) => {
+    return ipcRenderer.invoke(IpcChannel.ListDriveOfflineTasks, input);
+  },
+  addOfflineTasks: (input: DriveOfflineAddInput) => {
+    return ipcRenderer.invoke(IpcChannel.AddDriveOfflineTasks, input);
   },
   onUploadProgress: (listener: (progress: DriveUploadProgress) => void) => {
     const handler = (

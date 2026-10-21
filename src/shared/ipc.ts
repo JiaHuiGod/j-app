@@ -10,6 +10,10 @@ import type {
   DriveListInput,
   DriveListing,
   DriveMoveInput,
+  DriveOfflineAddInput,
+  DriveOfflineAddResult,
+  DriveOfflineListInput,
+  DriveOfflineTaskList,
   DriveRenameInput,
   DriveResult,
   DriveSearchInput,
@@ -52,6 +56,8 @@ export const IpcChannel = {
   MoveDriveEntry: 'drive:move-entry',
   UploadDriveFiles: 'drive:upload-files',
   UploadDroppedDriveFiles: 'drive:upload-dropped-files',
+  ListDriveOfflineTasks: 'drive:offline-list',
+  AddDriveOfflineTasks: 'drive:offline-add',
   DriveUploadProgress: 'drive:upload-progress',
 } as const;
 
@@ -115,6 +121,12 @@ export interface DriveApi {
     input: DriveUploadInput,
     files: readonly File[],
   ) => Promise<DriveResult<DriveUploadResult>>;
+  listOfflineTasks: (
+    input: DriveOfflineListInput,
+  ) => Promise<DriveResult<DriveOfflineTaskList>>;
+  addOfflineTasks: (
+    input: DriveOfflineAddInput,
+  ) => Promise<DriveResult<DriveOfflineAddResult>>;
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,
   ) => () => void;

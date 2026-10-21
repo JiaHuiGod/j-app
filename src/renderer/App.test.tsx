@@ -156,6 +156,8 @@ let uploadDriveFiles: ReturnType<typeof vi.fn<DriveApi['uploadFiles']>>;
 let uploadDroppedDriveFiles: ReturnType<
   typeof vi.fn<DriveApi['uploadDroppedFiles']>
 >;
+let listOfflineTasks: ReturnType<typeof vi.fn<DriveApi['listOfflineTasks']>>;
+let addOfflineTasks: ReturnType<typeof vi.fn<DriveApi['addOfflineTasks']>>;
 let onDriveUploadProgress: ReturnType<
   typeof vi.fn<DriveApi['onUploadProgress']>
 >;
@@ -237,6 +239,23 @@ beforeEach(() => {
         files: [],
       },
     });
+  listOfflineTasks = vi.fn<DriveApi['listOfflineTasks']>().mockResolvedValue({
+    ok: true,
+    data: {
+      tasks: [],
+      page: 1,
+      pageCount: 1,
+      total: 0,
+    },
+  });
+  addOfflineTasks = vi.fn<DriveApi['addOfflineTasks']>().mockResolvedValue({
+    ok: true,
+    data: {
+      successCount: 1,
+      failedCount: 0,
+      errors: [],
+    },
+  });
   onDriveUploadProgress = vi
     .fn<DriveApi['onUploadProgress']>()
     .mockReturnValue(() => {});
@@ -277,6 +296,8 @@ beforeEach(() => {
     moveEntry: moveDriveEntry,
     uploadFiles: uploadDriveFiles,
     uploadDroppedFiles: uploadDroppedDriveFiles,
+    listOfflineTasks,
+    addOfflineTasks,
     onUploadProgress: onDriveUploadProgress,
   };
   const appearance: AppearanceApi = {
@@ -746,6 +767,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '网盘' }));
     await screen.findByText('电影');
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const file = new File(['hello'], 'drop.txt', { type: 'text/plain' });
     const dataTransfer = {
@@ -768,6 +790,159 @@ describe('App', () => {
         [file],
       );
     });
+  });
+
+  it('lists offline tasks and submits to a changed folder', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockImplementation(async (input) => ({
+      ok: true,
+      data: input.folderId === '10' ? driveChildListing : driveRootListing,
+    }));
+    listOfflineTasks.mockResolvedValue({
+      ok: true,
+      data: {
+        tasks: [
+          {
+            id: 'history-1',
+            name: 'History task',
+            size: 4096,
+            progress: 100,
+            rate: 0,
+            status: 'finished',
+            statusText: '已完成',
+            targetFolderId: '0',
+            addedAt: null,
+            sourceUrl: 'magnet:?xt=urn:btih:history',
+          },
+          {
+            id: 'offline-1',
+            name: 'Ubuntu image',
+            size: 2048,
+            progress: 43,
+            rate: 1024,
+            status: 'downloading',
+            statusText: '下载中',
+            targetFolderId: '0',
+            addedAt: null,
+            sourceUrl: 'magnet:?xt=urn:btih:test',
+          },
+        ],
+        page: 1,
+        pageCount: 1,
+        total: 1,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.click(screen.getByRole('button', { name: '离线任务' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText('本次还没有提交离线任务。'),
+    ).toBeDefined();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '更改目录' }));
+    const picker = (await screen.findAllByRole('dialog')).at(-1);
+
+    if (!picker) {
+      throw new Error('folder picker did not open');
+    }
+
+    fireEvent.click(await within(picker).findByText('电影'));
+    await waitFor(() => {
+      expect(listDriveFolder).toHaveBeenLastCalledWith({
+        connectionId: driveAccount.connectionId,
+        folderId: '10',
+        offset: 0,
+        limit: 100,
+      });
+    });
+    fireEvent.click(
+      within(picker).getByRole('button', { name: '选择此文件夹' }),
+    );
+
+    fireEvent.change(within(dialog).getByLabelText('离线链接'), {
+      target: { value: 'magnet:?xt=urn:btih:test' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: '提交离线任务' }),
+    );
+
+    await waitFor(() => {
+      expect(addOfflineTasks).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        folderId: '10',
+        urls: ['magnet:?xt=urn:btih:test'],
+      });
+    });
+    expect(await within(dialog).findByText('Ubuntu image')).toBeDefined();
+    expect(within(dialog).queryByText('History task')).toBeNull();
+
+    const folderCallsBeforeClose = listDriveFolder.mock.calls.length;
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
+
+    await waitFor(() => {
+      expect(listDriveFolder.mock.calls.length).toBeGreaterThan(
+        folderCallsBeforeClose,
+      );
+    });
+  });
+
+  it('shows a separate offline error for each submitted link', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    addOfflineTasks.mockResolvedValue({
+      ok: true,
+      data: {
+        successCount: 0,
+        failedCount: 2,
+        errors: [
+          {
+            url: 'magnet:?xt=urn:btih:aaaa',
+            message: '任务已存在',
+          },
+          {
+            url: 'magnet:?xt=urn:btih:bbbb',
+            message: '错误的链接',
+          },
+        ],
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.click(screen.getByRole('button', { name: '离线任务' }));
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('离线链接'), {
+      target: {
+        value: 'magnet:?xt=urn:btih:aaaa\nmagnet:?xt=urn:btih:bbbb',
+      },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: '提交离线任务' }),
+    );
+
+    expect(await within(dialog).findByText('任务已存在')).toBeDefined();
+    expect(within(dialog).getByText('错误的链接')).toBeDefined();
+    expect(within(dialog).getByText('magnet:?xt=urn:btih:aaaa')).toBeDefined();
+    expect(within(dialog).getByText('magnet:?xt=urn:btih:bbbb')).toBeDefined();
   });
 
   it('searches only inside the current 115 folder', async () => {

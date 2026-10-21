@@ -14,10 +14,11 @@
 - 双击文件夹进入下一层；
 - 上传本地文件到当前目录，支持文件选择和拖拽，并显示逐文件进度；
 - 新建文件夹、重命名、移动、删除；
+- 离线任务：提交 magnet / ED2K / HTTP / FTP 链接到当前目录，查看 115 账号最近的任务和进度；
 - 未登录、登录失效、无账号、空目录、网络错误均有独立状态；
 - 登录失效时可以直接打开现有登录窗口重新登录。
 
-当前范围**不包含下载**和离线任务；下载计划最后实现。
+当前范围**不包含下载**；下载计划最后实现。
 
 ## 2. 架构
 
@@ -34,6 +35,7 @@ main/drive
   ├─ 115.ts           登录检测、目录、当前目录搜索
   ├─ 115-http.ts      显式 Cookie 请求、JSON 校验
   ├─ actions.ts       新建、重命名、移动、删除
+  ├─ offline.ts       离线任务列表、提交与凭证
   ├─ upload.ts        115 初始化上传 + OSS 直传
   └─ mapper.ts        115 原始字段 → DriveEntry
         │
@@ -49,22 +51,26 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 
 关键文件：
 
-| 文件                                            | 职责                                    |
-| ----------------------------------------------- | --------------------------------------- |
-| `src/shared/drive.ts`                           | 网盘账号、目录、文件操作和上传契约      |
-| `src/main/drive/accounts.ts`                    | 将 115 站点连接映射为网盘账号           |
-| `src/main/drive/detection.ts`                   | 识别 115 登录地址                       |
-| `src/main/drive/115.ts`                         | 115 登录探针、目录列表、当前目录搜索    |
-| `src/main/drive/115-http.ts`                    | 显式 Cookie 请求、JSON 响应与错误映射   |
-| `src/main/drive/actions.ts`                     | 新建、重命名、移动、删除                |
-| `src/main/drive/upload.ts`                      | 115 上传初始化、OSS 流式上传与进度      |
-| `src/main/drive/mapper.ts`                      | 115 响应归一化、HTML 标签清理、分页状态 |
-| `src/main/drive/ipc.ts`                         | 网盘 IPC 处理器                         |
-| `src/renderer/pages/DrivePage.tsx`              | 网盘页交互与状态                        |
-| `src/renderer/pages/DrivePage.module.css`       | 紧凑页头、搜索、列表和响应式样式        |
-| `src/renderer/components/DriveActionDialog.tsx` | 新建、重命名、删除确认对话框            |
-| `src/renderer/components/DriveMoveDialog.tsx`   | 目标目录选择与移动                      |
-| `src/renderer/components/DriveUploadPanel.tsx`  | 上传进度面板                            |
+| 文件                                                  | 职责                                    |
+| ----------------------------------------------------- | --------------------------------------- |
+| `src/shared/drive.ts`                                 | 网盘账号、目录、文件操作和上传契约      |
+| `src/main/drive/accounts.ts`                          | 将 115 站点连接映射为网盘账号           |
+| `src/main/drive/detection.ts`                         | 识别 115 登录地址                       |
+| `src/main/drive/115.ts`                               | 115 登录探针、目录列表、当前目录搜索    |
+| `src/main/drive/115-http.ts`                          | 显式 Cookie 请求、JSON 响应与错误映射   |
+| `src/main/drive/actions.ts`                           | 新建、重命名、移动、删除                |
+| `src/main/drive/offline.ts`                           | 离线任务签名、提交和任务列表            |
+| `src/main/drive/offline-mapper.ts`                    | 离线任务状态、进度和分页归一化          |
+| `src/main/drive/upload.ts`                            | 115 上传初始化、OSS 流式上传与进度      |
+| `src/main/drive/mapper.ts`                            | 115 响应归一化、HTML 标签清理、分页状态 |
+| `src/main/drive/ipc.ts`                               | 网盘 IPC 处理器                         |
+| `src/renderer/pages/DrivePage.tsx`                    | 网盘页交互与状态                        |
+| `src/renderer/pages/DrivePage.module.css`             | 紧凑页头、搜索、列表和响应式样式        |
+| `src/renderer/components/DriveActionDialog.tsx`       | 新建、重命名、删除确认对话框            |
+| `src/renderer/components/DriveMoveDialog.tsx`         | 目标目录选择与移动                      |
+| `src/renderer/components/DriveFolderPickerDialog.tsx` | 离线任务保存目录选择                    |
+| `src/renderer/components/DriveUploadPanel.tsx`        | 上传进度面板                            |
+| `src/renderer/components/DriveOfflineDialog.tsx`      | 离线任务提交与列表                      |
 
 ## 3. 账号与登录
 
@@ -156,6 +162,25 @@ POST https://webapi.115.com/rb/delete
 
 文件选择支持主进程原生文件对话框和文件拖拽。拖拽时 preload 通过 `webUtils.getPathForFile()` 将 `File` 解析为路径，路径不返回 renderer；主进程重新校验路径是普通文件后才复用同一上传管线。暂不支持拖拽文件夹。上传进度通过只包含文件名、字节数和状态的 IPC 事件回传。
 
+### 离线任务
+
+```text
+GET https://115.com/web/lixian/?ct=lixian&ac=task_lists&page=1
+
+GET https://115.com/?ct=offline&ac=space&_=<timestamp>
+GET https://webapi.115.com/offine/downpath
+
+POST https://115.com/web/lixian/?ct=lixian&ac=add_task_url
+POST https://115.com/web/lixian/?ct=lixian&ac=add_task_urls
+  savepath=&wp_path_id=<folderId>&url=<url>&uid=<uid>&sign=<sign>&time=<time>
+```
+
+- 单条链接使用 `add_task_url` 和 `url` 字段；
+- 多条链接使用 `add_task_urls` 和 `url[0]`、`url[1]` 等字段；
+- 提交前并行获取离线空间凭证 `sign/time` 和用户 `uid`；
+- 后端读取最近一页任务用于匹配本次提交结果；界面只显示本次弹窗提交过的链接对应任务，不展示账号历史任务；
+- 打开离线任务面板时每 4 秒自动刷新；有任务提交后关闭弹窗，会清空目录缓存并强制刷新当前目录。
+
 ### 错误模型
 
 IPC 返回 `DriveResult<T>`，而不是依赖 Electron 对自定义 Error 的序列化：
@@ -177,14 +202,17 @@ type DriveResult<T> =
     };
 ```
 
+解析 115 的 `state: false` 响应时，会依次读取 `error`、`error_msg`、`errmsg`、`message`、`msg`，把服务端文案直接作为 `DriveError.message` 返回；没有文案时才回退到错误码或通用提示。批量提交时，`result` 数组里的每一条错误都会带上自己的 `url` 和 `error_msg`，界面按链接逐条展示，不会只显示第一条。
+
 ## 5. 页面交互
 
-- 页头保持紧凑：115 标识、连接状态、新建文件夹、上传到当前目录、当前目录搜索框、刷新；窄窗口下两个快捷按钮只显示图标，并保留 tooltip；
+- 页头保持紧凑：115 标识、连接状态、新建文件夹、上传到当前目录、离线任务、当前目录搜索框、刷新；窄窗口下三个快捷按钮只显示图标，并保留 tooltip；
 - 工具栏在选中项目后显示重命名、移动、删除；
 - 上传始终以当前目录为目标，不会上传到已选中的文件夹；
 - 拖拽文件时显示“松开以上传到当前目录”遮罩，目标目录会明确显示；不支持拖拽文件夹；
 - 上传完成后显示逐文件结果面板；全部成功时约 2.6 秒后自动消失，有失败项时保留到用户手动关闭；
 - 如果上传完成时不在网盘页，成功结果面板不会开始自动消失；回到网盘页后再开始计时；
+- 离线任务弹窗支持多链接提交，可通过目录选择器更改保存目录；任务列表只显示本次提交的链接对应的状态、进度和速率；
 - 搜索只在当前目录内生效，结果仍显示当前面包屑，并显示搜索关键词；
 - 双击文件夹进入下一层；键盘聚焦文件夹后按 Enter 也可进入；
 - 单击单选；按住 Ctrl（macOS 为 Cmd）再点击可追加或取消选择；
@@ -196,6 +224,8 @@ type DriveResult<T> =
 ## 6. 安全边界
 
 - 目录和文件操作固定访问 `https://webapi.115.com`，上传初始化固定访问 `https://uplb.115.com`；
+- 离线任务固定访问 `https://115.com` 和 `https://webapi.115.com/offine/downpath`；
+- 离线链接只接受 `magnet:`、`ed2k:`、`http:`、`https:`、`ftp:`，长度上限 4096，单次最多 20 条；
 - OSS host 来自 115 初始化响应，只允许 `http:` / `https:`，上传请求不携带 115 Cookie；
 - `connectionId` 校验 UUID，`folderId` / `fid` 只接受数字字符串；
 - 名称限制长度，并拒绝路径分隔符和控制字符；
@@ -217,7 +247,10 @@ type DriveResult<T> =
 - 切换到其他页面再回到网盘时，不重新挂载网盘页，保留当前目录、滚动位置、选中项和搜索状态；
 - 目录数据在内存中短期缓存，重新进入同一目录时优先显示缓存，超过缓存时间后再静默刷新；切回网盘页本身不会主动重新请求；
 - 已实际验证新建文件夹、重命名单项、批量移动、批量删除、小文件上传、文件拖拽上传及上传后的清理；
+- 已实际读取真实 115 账号的离线任务列表并验证保存目录选择；本次任务过滤和关闭后目录刷新有界面测试覆盖；
+- 已实际提交无效的离线单条和多条链接，验证单条显示“错误的链接”，多条会按链接分别返回错误；界面测试覆盖不同链接对应不同错误文案；
 - 上传大文件采用流式读取，但进度回调节流和断点续传尚未实现；
-- 48 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。
+- 离线任务暂不支持暂停、继续或删除任务，仅支持提交和查看最近任务；
+- 51 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。
 
 下载尚未实现，计划放在最后处理。

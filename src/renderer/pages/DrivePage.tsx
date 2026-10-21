@@ -19,6 +19,7 @@ import type {
 import { toErrorMessage } from '../lib/errors';
 import { DriveActionDialog } from '../components/DriveActionDialog';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
+import { DriveOfflineDialog } from '../components/DriveOfflineDialog';
 import { DriveUploadPanel } from '../components/DriveUploadPanel';
 import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
@@ -463,6 +464,15 @@ function UploadIcon() {
   );
 }
 
+function OfflineIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M5.5 14.6h9a3.2 3.2 0 0 0 .4-6.4A4.5 4.5 0 0 0 5 7.9a3.5 3.5 0 0 0 .5 6.7Z" />
+      <path d="M10 9.1v5M7.9 12l2.1 2.1 2.1-2.1" />
+    </svg>
+  );
+}
+
 function PencilIcon() {
   return (
     <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
@@ -790,6 +800,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [dialog, setDialog] = useState<DriveDialogState | null>(null);
+  const [isOfflineOpen, setIsOfflineOpen] = useState(false);
   const [uploadBatch, setUploadBatch] = useState<UploadBatchState | null>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const requestIdRef = useRef(0);
@@ -799,6 +810,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const folderCacheRef = useRef(new Map<string, CachedFolder>());
   const dragDepthRef = useRef(0);
   const uploadInFlightRef = useRef(false);
+  const offlineSubmittedRef = useRef(false);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
 
@@ -1633,6 +1645,19 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                   {isUploading ? '上传中…' : '上传到当前目录'}
                 </span>
               </button>
+              <button
+                aria-label="离线任务"
+                className={styles.quickButton}
+                disabled={!canMutate}
+                title="查看和提交离线任务"
+                type="button"
+                onClick={() => {
+                  setIsOfflineOpen(true);
+                }}
+              >
+                <OfflineIcon />
+                <span className={styles.quickLabel}>离线任务</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1945,6 +1970,32 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
           }}
           onCompleted={() => {
             void refreshAfterMutation(false);
+          }}
+        />
+      )}
+
+      {isOfflineOpen && account && (
+        <DriveOfflineDialog
+          connectionId={account.connectionId}
+          folderId={currentFolderId}
+          folderName={currentFolderName}
+          onClose={() => {
+            setIsOfflineOpen(false);
+
+            if (offlineSubmittedRef.current) {
+              offlineSubmittedRef.current = false;
+              folderCacheRef.current.clear();
+              void loadFolder(
+                account.connectionId,
+                currentFolderId,
+                0,
+                false,
+                true,
+              );
+            }
+          }}
+          onSubmitted={() => {
+            offlineSubmittedRef.current = true;
           }}
         />
       )}
