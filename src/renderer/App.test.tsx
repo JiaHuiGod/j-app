@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppearanceState } from '@shared/appearance';
 import type { SiteConnectionSummary } from '@shared/connections';
@@ -141,6 +148,17 @@ let clearAllConnections: ReturnType<typeof vi.fn<ConnectionsApi['clearAll']>>;
 let listDriveAccounts: ReturnType<typeof vi.fn<DriveApi['listAccounts']>>;
 let listDriveFolder: ReturnType<typeof vi.fn<DriveApi['listFolder']>>;
 let searchDriveFolder: ReturnType<typeof vi.fn<DriveApi['searchFolder']>>;
+let createDriveFolder: ReturnType<typeof vi.fn<DriveApi['createFolder']>>;
+let renameDriveEntry: ReturnType<typeof vi.fn<DriveApi['renameEntry']>>;
+let deleteDriveEntry: ReturnType<typeof vi.fn<DriveApi['deleteEntry']>>;
+let moveDriveEntry: ReturnType<typeof vi.fn<DriveApi['moveEntry']>>;
+let uploadDriveFiles: ReturnType<typeof vi.fn<DriveApi['uploadFiles']>>;
+let uploadDroppedDriveFiles: ReturnType<
+  typeof vi.fn<DriveApi['uploadDroppedFiles']>
+>;
+let onDriveUploadProgress: ReturnType<
+  typeof vi.fn<DriveApi['onUploadProgress']>
+>;
 let getAppearance: ReturnType<typeof vi.fn<AppearanceApi['get']>>;
 let setAppearanceTheme: ReturnType<typeof vi.fn<AppearanceApi['setTheme']>>;
 
@@ -187,6 +205,41 @@ beforeEach(() => {
       hasMore: false,
     },
   });
+  createDriveFolder = vi
+    .fn<DriveApi['createFolder']>()
+    .mockResolvedValue({ ok: true, data: null });
+  renameDriveEntry = vi
+    .fn<DriveApi['renameEntry']>()
+    .mockResolvedValue({ ok: true, data: null });
+  deleteDriveEntry = vi
+    .fn<DriveApi['deleteEntry']>()
+    .mockResolvedValue({ ok: true, data: null });
+  moveDriveEntry = vi
+    .fn<DriveApi['moveEntry']>()
+    .mockResolvedValue({ ok: true, data: null });
+  uploadDriveFiles = vi.fn<DriveApi['uploadFiles']>().mockResolvedValue({
+    ok: true,
+    data: {
+      canceled: true,
+      uploaded: 0,
+      failed: 0,
+      files: [],
+    },
+  });
+  uploadDroppedDriveFiles = vi
+    .fn<DriveApi['uploadDroppedFiles']>()
+    .mockResolvedValue({
+      ok: true,
+      data: {
+        canceled: true,
+        uploaded: 0,
+        failed: 0,
+        files: [],
+      },
+    });
+  onDriveUploadProgress = vi
+    .fn<DriveApi['onUploadProgress']>()
+    .mockReturnValue(() => {});
   getAppearance = vi
     .fn<AppearanceApi['get']>()
     .mockResolvedValue(appearanceState);
@@ -218,6 +271,13 @@ beforeEach(() => {
     listAccounts: listDriveAccounts,
     listFolder: listDriveFolder,
     searchFolder: searchDriveFolder,
+    createFolder: createDriveFolder,
+    renameEntry: renameDriveEntry,
+    deleteEntry: deleteDriveEntry,
+    moveEntry: moveDriveEntry,
+    uploadFiles: uploadDriveFiles,
+    uploadDroppedFiles: uploadDroppedDriveFiles,
+    onUploadProgress: onDriveUploadProgress,
   };
   const appearance: AppearanceApi = {
     get: getAppearance,
@@ -421,6 +481,293 @@ describe('App', () => {
 
     expect(await screen.findByText('电影')).toBeDefined();
     expect(listDriveFolder).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates a folder in the current 115 directory', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+
+    fireEvent.click(screen.getByRole('button', { name: '新建文件夹' }));
+    fireEvent.change(await screen.findByLabelText('文件夹名称'), {
+      target: { value: '新目录' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建文件夹' }));
+
+    await waitFor(() => {
+      expect(createDriveFolder).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        parentId: '0',
+        name: '新目录',
+      });
+    });
+  });
+
+  it('renames a selected 115 file', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('readme.txt'));
+    fireEvent.click(screen.getByRole('button', { name: '重命名' }));
+
+    fireEvent.change(await screen.findByLabelText('新名称'), {
+      target: { value: 'notes.txt' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
+
+    await waitFor(() => {
+      expect(renameDriveEntry).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        entryId: '20',
+        kind: 'file',
+        name: 'notes.txt',
+      });
+    });
+  });
+
+  it('deletes a selected 115 file after confirmation', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('readme.txt'));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+
+    await waitFor(() => {
+      expect(deleteDriveEntry).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        entries: [{ parentId: '0', entryId: '20' }],
+      });
+    });
+  });
+
+  it('moves a selected 115 file to the target folder', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('readme.txt'));
+    fireEvent.click(screen.getByRole('button', { name: '移动' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('电影');
+    fireEvent.click(within(dialog).getByRole('button', { name: '移动到这里' }));
+
+    await waitFor(() => {
+      expect(moveDriveEntry).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        entryIds: ['20'],
+        targetFolderId: '0',
+      });
+    });
+  });
+
+  it('multi-selects with Ctrl and deletes the selected entries', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+
+    fireEvent.click(screen.getByText('readme.txt'));
+    fireEvent.click(screen.getByText('电影'), { ctrlKey: true });
+
+    expect(screen.getByText('已选 2 项')).toBeDefined();
+    expect(
+      (screen.getByRole('button', { name: '重命名' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+
+    await waitFor(() => {
+      expect(deleteDriveEntry).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        entries: [
+          { parentId: '0', entryId: '10' },
+          { parentId: '0', entryId: '20' },
+        ],
+      });
+    });
+  });
+
+  it('starts an upload into the current 115 directory', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+
+    await waitFor(() => {
+      expect(uploadDriveFiles).toHaveBeenCalledWith({
+        connectionId: driveAccount.connectionId,
+        targetFolderId: '0',
+      });
+    });
+  });
+
+  it('dismisses a fully successful upload report automatically', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    uploadDriveFiles.mockResolvedValue({
+      ok: true,
+      data: {
+        canceled: false,
+        uploaded: 1,
+        failed: 0,
+        files: [{ name: 'ok.txt', status: 'success' }],
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+
+    expect(await screen.findByLabelText('上传进度')).toBeDefined();
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await waitFor(() => {
+      expect(screen.queryByLabelText('上传进度')).toBeNull();
+    });
+  });
+
+  it('keeps a successful upload report while the drive page is hidden', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    let resolveUpload!: (
+      value: Awaited<ReturnType<DriveApi['uploadFiles']>>,
+    ) => void;
+    const uploadPromise = new Promise<
+      Awaited<ReturnType<DriveApi['uploadFiles']>>
+    >((resolve) => {
+      resolveUpload = resolve;
+    });
+    uploadDriveFiles.mockReturnValue(uploadPromise);
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }));
+    await screen.findByLabelText('上传进度');
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByRole('heading', { level: 1, name: /设置/ });
+
+    resolveUpload({
+      ok: true,
+      data: {
+        canceled: false,
+        uploaded: 1,
+        failed: 0,
+        files: [{ name: 'ok.txt', status: 'success' }],
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    expect(await screen.findByLabelText('上传进度')).toBeDefined();
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await waitFor(() => {
+      expect(screen.queryByLabelText('上传进度')).toBeNull();
+    });
+  }, 12_000);
+
+  it('uploads files dropped onto the drive workspace', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByText('电影');
+
+    const file = new File(['hello'], 'drop.txt', { type: 'text/plain' });
+    const dataTransfer = {
+      types: ['Files'],
+      files: [file],
+      items: [],
+    } as unknown as DataTransfer;
+
+    fireEvent.dragEnter(window, { dataTransfer });
+    expect(await screen.findByText('松开以上传到当前目录')).toBeDefined();
+
+    fireEvent.drop(window, { dataTransfer });
+
+    await waitFor(() => {
+      expect(uploadDroppedDriveFiles).toHaveBeenCalledWith(
+        {
+          connectionId: driveAccount.connectionId,
+          targetFolderId: '0',
+        },
+        [file],
+      );
+    });
   });
 
   it('searches only inside the current 115 folder', async () => {

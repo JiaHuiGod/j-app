@@ -1,0 +1,209 @@
+.panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px -26px rgb(23 25 31 / 36%),
+    0 8px 24px -18px rgb(23 25 31 / 26%);
+  animation: upload-enter 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.kicker {
+  margin: 0 0 2px;
+  color: var(--blue);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.56rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: -0.02em;
+}
+
+.closeButton {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.closeButton:hover {
+  color: var(--ink);
+  background: rgb(23 25 31 / 6%);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.activeProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 12px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.activeCopy {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink);
+  font-size: 0.66rem;
+}
+
+.activeCopy span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeCopy span:last-child {
+  flex: none;
+  color: var(--blue);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.62rem;
+}
+
+.progressTrack {
+  height: 5px;
+  overflow: hidden;
+  background: rgb(23 25 31 / 7%);
+  border-radius: 999px;
+}
+
+.progressBar {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: inherit;
+  transition: width 0.2s ease;
+}
+
+.bytes {
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.56rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 150px;
+  padding: 8px 0 0;
+  margin: 8px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  scrollbar-color: rgb(23 25 31 / 16%) transparent;
+  scrollbar-width: thin;
+}
+
+.item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 25px;
+  padding: 2px 3px;
+  font-size: 0.62rem;
+}
+
+.fileName {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemStatus {
+  flex: none;
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.56rem;
+}
+
+.success {
+  color: var(--success);
+}
+
+.failed {
+  color: var(--danger);
+}
+
+.error {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.65rem;
+  line-height: 1.5;
+}
+
+@keyframes upload-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .panel {
+    box-shadow:
+      0 24px 60px -26px rgb(0 0 0 / 62%),
+      0 8px 24px -18px rgb(0 0 0 / 46%);
+  }
+
+  .closeButton:hover {
+    background: rgb(255 255 255 / 7%);
+  }
+
+  .progressTrack {
+    background: rgb(255 255 255 / 8%);
+  }
+
+  .list {
+    scrollbar-color: rgb(255 255 255 / 18%) transparent;
+  }
+}
+
+@media (max-width: 680px) {
+  .panel {
+    right: 16px;
+    bottom: 16px;
+  }
+}

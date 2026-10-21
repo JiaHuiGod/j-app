@@ -2,7 +2,7 @@
 
 一个面向实际开发起步的 Electron 桌面应用工程：**Electron Forge + Vite + React 19 + TypeScript**。
 
-项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理，以及 115 网盘只读浏览。
+项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理，以及 115 网盘浏览、搜索、文件拖拽/选择上传与文件管理。
 
 ![J App 运行预览](docs/preview.png)
 
@@ -73,7 +73,7 @@ j-app/
 │  ├─ cookie-dialog.png         # 添加站点登录弹窗
 │  ├─ clear-all-dialog.png      # 清理全部站点确认弹窗
 │  ├─ cookie-sessions.md        # 站点 Cookie 会话功能文档
-│  ├─ drive-115.md              # 115 网盘只读浏览文档
+│  ├─ drive-115.md              # 115 网盘浏览与文件操作文档
 │  ├─ themes.md                 # 主题与外观功能文档
 │  ├─ proxy-dialog.png          # 网络代理弹窗
 │  ├─ proxy-saved.png           # 开启代理后的重启提示
@@ -140,7 +140,7 @@ j-app/
 │  │  ├─ pages/
 │  │  │  ├─ OverviewPage.tsx     # 概览页
 │  │  │  ├─ OverviewPage.module.css # 概览布局与运行环境
-│  │  │  ├─ DrivePage.tsx        # 115 网盘只读浏览
+│  │  │  ├─ DrivePage.tsx        # 115 网盘浏览、搜索与文件操作
 │  │  │  ├─ DrivePage.module.css # 网盘页头、搜索与文件列表
 │  │  │  ├─ SettingsPage.tsx     # 外观、账号、资源提示与数据清理
 │  │  │  └─ SettingsPage.module.css # 设置页与站点连接
@@ -158,7 +158,7 @@ j-app/
 │  ├─ shared/                   # 三端共享的纯类型与契约
 │  │  ├─ appearance.ts          # 主题偏好与解析状态
 │  │  ├─ connections.ts         # 站点连接与 Cookie 摘要类型
-│  │  ├─ drive.ts               # 网盘账号、目录与搜索契约
+│  │  ├─ drive.ts               # 网盘账号、目录、文件操作与上传契约
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
 │  │  ├─ settings.ts            # 应用设置与代理数据类型
 │  │  └─ window.d.ts            # window.desktop 的全局类型
@@ -235,12 +235,12 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 主导航目前提供三个页面：
 
 - **概览**：现有工程自检与运行环境
-- **网盘**：115 网盘只读浏览，支持根目录/文件夹浏览与当前目录搜索
+- **网盘**：115 网盘浏览、当前目录搜索、文件选择/拖拽上传、新建文件夹、重命名、Ctrl 多选、批量移动与删除
 - **设置**：应用主题外观与站点账号管理，网络代理仍保持从标题栏独立打开
 
-导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换时会回到内容顶部，并使用 `aria-current` 标记当前页面。
+导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换到网盘页时会保留上次目录、滚动位置、选中项和搜索状态。
 
-网盘页通过已保存的 115 站点连接读取目录，不向渲染层暴露 Cookie。当前仅支持只读浏览：不支持上传、下载、重命名、移动或删除。实现细节见 [115 网盘文档](docs/drive-115.md)。
+网盘页通过已保存的 115 站点连接读取目录，不向渲染层暴露 Cookie。当前支持文件选择/拖拽上传、新建文件夹、重命名、Ctrl 多选、批量移动和删除，暂不支持拖拽文件夹；下载尚未实现。实现细节见 [115 网盘文档](docs/drive-115.md)。
 
 设置页面：
 

@@ -1,7 +1,6 @@
 import type { Session } from 'electron';
 import type {
   DriveError,
-  DriveErrorCode,
   DriveListing,
   DriveResult,
   DriveSearchResult,
@@ -10,7 +9,7 @@ import { getSiteSession } from '../connections/session-manager';
 import { findSiteConnection } from '../settings/store';
 import { parseSiteConnectionId } from '../settings/schema';
 import { is115Connection } from './detection';
-import { request115 } from './115-http';
+import { fetch115Json } from './115-http';
 import { normalize115Listing, normalize115SearchResult } from './mapper';
 
 const API_ORIGIN = 'https://webapi.115.com';
@@ -31,16 +30,6 @@ interface ParsedFolderRequest extends ParsedPage {
 
 interface ParsedSearchRequest extends ParsedFolderRequest {
   readonly query: string;
-}
-
-function failure<T>(code: DriveErrorCode, message: string): DriveResult<T> {
-  return {
-    ok: false,
-    error: {
-      code,
-      message,
-    },
-  };
 }
 
 function parseInteger(
@@ -142,7 +131,7 @@ function parseSearchRequest(value: unknown): ParsedSearchRequest | DriveError {
   };
 }
 
-async function getAccountSession(
+export async function getAccountSession(
   connectionId: string,
 ): Promise<Session | DriveError> {
   const connection = await findSiteConnection(connectionId);
@@ -169,53 +158,6 @@ async function getAccountSession(
       message: '无法初始化 115 站点会话。',
     };
   }
-}
-
-async function fetch115Json(
-  siteSession: Session,
-  url: string,
-): Promise<DriveResult<Record<string, unknown>>> {
-  const response = await request115(siteSession, url);
-
-  if (!response.ok) {
-    return response;
-  }
-
-  const { status, body: text } = response.data;
-
-  if (status === 401 || status === 403) {
-    return failure('auth_required', '115 登录已失效，请重新登录。');
-  }
-
-  if (status < 200 || status >= 300) {
-    return failure('api', `115 请求失败（HTTP ${status}）。`);
-  }
-
-  let body: unknown;
-
-  try {
-    body = JSON.parse(text) as unknown;
-  } catch {
-    return failure('api', '115 返回了无法解析的响应。');
-  }
-
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return failure('api', '115 返回了异常响应。');
-  }
-
-  const record = body as Record<string, unknown>;
-  const errorMessage =
-    typeof record.error === 'string' ? record.error.trim() : '';
-
-  if (record.state === false) {
-    if (errorMessage.includes('登录')) {
-      return failure('auth_required', '115 登录已失效，请重新登录。');
-    }
-
-    return failure('api', errorMessage || '115 接口返回失败，请稍后重试。');
-  }
-
-  return { ok: true, data: record };
 }
 
 function buildListUrl(request: ParsedFolderRequest): string {

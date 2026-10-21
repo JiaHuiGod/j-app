@@ -77,3 +77,65 @@ export interface DriveSearchResult {
   readonly total: number;
   readonly hasMore: boolean;
 }
+
+export interface DriveCreateFolderInput {
+  readonly connectionId: string;
+  readonly parentId: string;
+  readonly name: string;
+}
+
+export interface DriveRenameInput {
+  readonly connectionId: string;
+  readonly entryId: string;
+  readonly kind: 'file' | 'folder';
+  readonly name: string;
+}
+
+export interface DriveDeleteTarget {
+  readonly entryId: string;
+  readonly parentId: string;
+}
+
+export interface DriveDeleteInput {
+  readonly connectionId: string;
+  readonly entries: readonly DriveDeleteTarget[];
+}
+
+export interface DriveMoveInput {
+  readonly connectionId: string;
+  readonly entryIds: readonly string[];
+  readonly targetFolderId: string;
+}
+
+export interface DriveUploadInput {
+  readonly connectionId: string;
+  readonly targetFolderId: string;
+}
+
+export interface DriveDroppedUploadInput extends DriveUploadInput {
+  readonly filePaths: readonly string[];
+}
+
+export interface DriveUploadFileResult {
+  readonly name: string;
+  readonly status: 'success' | 'failed';
+  readonly message?: string;
+}
+
+export interface DriveUploadResult {
+  readonly canceled: boolean;
+  readonly uploaded: number;
+  readonly failed: number;
+  readonly files: readonly DriveUploadFileResult[];
+}
+
+export interface DriveUploadProgress {
+  readonly uploadId: string;
+  readonly fileName: string;
+  readonly fileIndex: number;
+  readonly fileCount: number;
+  readonly uploadedBytes: number;
+  readonly totalBytes: number;
+  readonly status: 'uploading' | 'success' | 'failed';
+  readonly error?: string;
+}

@@ -5,11 +5,18 @@ import type {
 } from './connections';
 import type {
   DriveAccount,
+  DriveCreateFolderInput,
+  DriveDeleteInput,
   DriveListInput,
   DriveListing,
+  DriveMoveInput,
+  DriveRenameInput,
   DriveResult,
   DriveSearchInput,
   DriveSearchResult,
+  DriveUploadInput,
+  DriveUploadProgress,
+  DriveUploadResult,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
@@ -39,6 +46,13 @@ export const IpcChannel = {
   ListDriveAccounts: 'drive:list-accounts',
   ListDriveFolder: 'drive:list-folder',
   SearchDriveFolder: 'drive:search-folder',
+  CreateDriveFolder: 'drive:create-folder',
+  RenameDriveEntry: 'drive:rename-entry',
+  DeleteDriveEntry: 'drive:delete-entry',
+  MoveDriveEntry: 'drive:move-entry',
+  UploadDriveFiles: 'drive:upload-files',
+  UploadDroppedDriveFiles: 'drive:upload-dropped-files',
+  DriveUploadProgress: 'drive:upload-progress',
 } as const;
 
 export interface AppInfo {
@@ -90,6 +104,20 @@ export interface DriveApi {
   searchFolder: (
     input: DriveSearchInput,
   ) => Promise<DriveResult<DriveSearchResult>>;
+  createFolder: (input: DriveCreateFolderInput) => Promise<DriveResult<null>>;
+  renameEntry: (input: DriveRenameInput) => Promise<DriveResult<null>>;
+  deleteEntry: (input: DriveDeleteInput) => Promise<DriveResult<null>>;
+  moveEntry: (input: DriveMoveInput) => Promise<DriveResult<null>>;
+  uploadFiles: (
+    input: DriveUploadInput,
+  ) => Promise<DriveResult<DriveUploadResult>>;
+  uploadDroppedFiles: (
+    input: DriveUploadInput,
+    files: readonly File[],
+  ) => Promise<DriveResult<DriveUploadResult>>;
+  onUploadProgress: (
+    listener: (progress: DriveUploadProgress) => void,
+  ) => () => void;
 }
 
 /**

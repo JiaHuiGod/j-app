@@ -1,7 +1,21 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import {
+  contextBridge,
+  ipcRenderer,
+  webUtils,
+  type IpcRendererEvent,
+} from 'electron';
 import type { ThemePreference } from '@shared/appearance';
 import type { CreateSiteConnectionInput } from '@shared/connections';
-import type { DriveListInput, DriveSearchInput } from '@shared/drive';
+import type {
+  DriveCreateFolderInput,
+  DriveDeleteInput,
+  DriveListInput,
+  DriveMoveInput,
+  DriveRenameInput,
+  DriveSearchInput,
+  DriveUploadInput,
+  DriveUploadProgress,
+} from '@shared/drive';
 import {
   IpcChannel,
   type AppearanceApi,
@@ -80,6 +94,50 @@ const drive = Object.freeze<DriveApi>({
   },
   searchFolder: (input: DriveSearchInput) => {
     return ipcRenderer.invoke(IpcChannel.SearchDriveFolder, input);
+  },
+  createFolder: (input: DriveCreateFolderInput) => {
+    return ipcRenderer.invoke(IpcChannel.CreateDriveFolder, input);
+  },
+  renameEntry: (input: DriveRenameInput) => {
+    return ipcRenderer.invoke(IpcChannel.RenameDriveEntry, input);
+  },
+  deleteEntry: (input: DriveDeleteInput) => {
+    return ipcRenderer.invoke(IpcChannel.DeleteDriveEntry, input);
+  },
+  moveEntry: (input: DriveMoveInput) => {
+    return ipcRenderer.invoke(IpcChannel.MoveDriveEntry, input);
+  },
+  uploadFiles: (input: DriveUploadInput) => {
+    return ipcRenderer.invoke(IpcChannel.UploadDriveFiles, input);
+  },
+  uploadDroppedFiles: (input: DriveUploadInput, files: readonly File[]) => {
+    const filePaths = files.flatMap((file) => {
+      try {
+        const filePath = webUtils.getPathForFile(file);
+        return filePath ? [filePath] : [];
+      } catch {
+        return [];
+      }
+    });
+
+    return ipcRenderer.invoke(IpcChannel.UploadDroppedDriveFiles, {
+      ...input,
+      filePaths,
+    });
+  },
+  onUploadProgress: (listener: (progress: DriveUploadProgress) => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      progress: DriveUploadProgress,
+    ) => {
+      listener(progress);
+    };
+
+    ipcRenderer.on(IpcChannel.DriveUploadProgress, handler);
+
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.DriveUploadProgress, handler);
+    };
   },
 });
 

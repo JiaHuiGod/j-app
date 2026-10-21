@@ -73,21 +73,77 @@
   place-items: center;
 }
 
-.statusPill,
-.readonlyPill {
+.statusPill {
   display: inline-flex;
   gap: 6px;
   align-items: center;
   padding: 5px 9px;
-  color: var(--muted);
+  color: var(--success);
   font-size: 0.68rem;
   background: rgb(23 25 31 / 4%);
   border: 1px solid var(--line);
   border-radius: 7px;
 }
 
-.statusPill {
-  color: var(--success);
+.quickActions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.quickButton {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  height: 32px;
+  padding: 0 9px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.quickButton:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.quickButton:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.quickButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.quickButton svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+}
+
+.quickButtonUpload {
+  color: var(--blue);
+  background: rgb(33 72 255 / 5%);
+  border-color: rgb(33 72 255 / 16%);
+}
+
+.quickButtonUpload:hover:not(:disabled) {
+  color: var(--blue);
+  background: rgb(33 72 255 / 9%);
 }
 
 .statusPill.statusError {
@@ -108,15 +164,6 @@
 
 .statusError .statusDot {
   box-shadow: 0 0 0 3px rgb(215 68 73 / 9%);
-}
-
-.readonlyPill svg {
-  width: 11px;
-  height: 11px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.35;
 }
 
 .headerActions {
@@ -368,18 +415,82 @@
   border-left: 1px solid var(--line);
 }
 
-.searchSummary {
+.toolbarSide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.toolbarMeta {
+  max-width: 240px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.openHint {
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.toolButton {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  height: 28px;
+  padding: 0 9px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 650;
   white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.toolButton:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgb(23 25 31 / 4%);
+}
+
+.toolButton:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.toolButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.toolButton svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+}
+
+.toolButtonDanger {
+  color: var(--danger);
+}
+
+.toolButtonDanger:hover:not(:disabled) {
+  color: var(--danger);
+  background: rgb(215 68 73 / 7%);
+  border-color: rgb(215 68 73 / 18%);
 }
 
 .listView {
@@ -753,9 +864,27 @@
   }
 
   .searchForm kbd,
-  .statusPill,
-  .readonlyPill {
+  .statusPill {
     background: rgb(255 255 255 / 4%);
+  }
+
+  .quickButton {
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .quickButton:hover:not(:disabled) {
+    background: rgb(255 255 255 / 7%);
+  }
+
+  .quickButtonUpload {
+    color: #9fb0ff;
+    background: rgb(100 126 255 / 10%);
+    border-color: rgb(100 126 255 / 22%);
+  }
+
+  .quickButtonUpload:hover:not(:disabled) {
+    color: #b8c5ff;
+    background: rgb(100 126 255 / 15%);
   }
 
   .statusDot {
@@ -865,6 +994,18 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .quickButton {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .quickLabel {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
   .tableHead,
   .fileRow {
@@ -930,10 +1071,6 @@
     gap: 7px;
   }
 
-  .readonlyPill {
-    display: none;
-  }
-
   .headerActions {
     flex-wrap: wrap;
   }
@@ -962,18 +1099,25 @@
     border-left: 0;
   }
 
-  .searchSummary {
+  .toolbarSide {
     width: 100%;
-    margin-left: 28px;
-    white-space: normal;
+    justify-content: flex-start;
   }
 
-  .openHint {
+  .toolbarMeta {
     width: 100%;
+    max-width: none;
     margin-left: 28px;
-    white-space: normal;
   }
 
+  .toolbarActions {
+    width: 100%;
+  }
+
+  .toolButton {
+    flex: 1;
+    justify-content: center;
+  }
   .tableHead {
     display: none;
   }
@@ -1011,5 +1155,109 @@
     gap: 8px;
     align-items: flex-start;
     padding: 10px 14px;
+  }
+}
+
+.dropOverlay {
+  position: fixed;
+  z-index: 50;
+  display: grid;
+  inset: 0;
+  padding: 24px;
+  pointer-events: none;
+  background: rgb(18 20 25 / 38%);
+  backdrop-filter: blur(4px);
+  place-items: center;
+  animation: drop-overlay-in 0.14s ease-out;
+}
+
+.dropPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  width: min(380px, calc(100vw - 48px));
+  padding: 28px 26px;
+  color: var(--ink);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid rgb(33 72 255 / 28%);
+  border-radius: 20px;
+  box-shadow: 0 28px 70px -30px rgb(23 25 31 / 52%);
+}
+
+.dropIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 2px;
+  color: var(--blue);
+  background: rgb(33 72 255 / 9%);
+  border-radius: 12px;
+  place-items: center;
+}
+
+.dropIcon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+}
+
+.dropPanel strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.dropPanel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.dropHint {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.dropOverlayBlocked .dropPanel {
+  border-color: rgb(215 68 73 / 25%);
+}
+
+.dropOverlayBlocked .dropIcon {
+  color: var(--danger);
+  background: rgb(215 68 73 / 8%);
+}
+
+@keyframes drop-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .dropPanel {
+    border-color: rgb(100 126 255 / 34%);
+    box-shadow: 0 28px 70px -30px rgb(0 0 0 / 72%);
+  }
+
+  .dropIcon {
+    background: rgb(100 126 255 / 13%);
+  }
+
+  .dropOverlayBlocked .dropPanel {
+    border-color: rgb(255 123 128 / 30%);
+  }
+
+  .dropOverlayBlocked .dropIcon {
+    background: rgb(255 108 113 / 10%);
   }
 }

@@ -12,8 +12,14 @@ import type {
   DriveBreadcrumb,
   DriveEntry,
   DriveError,
+  DriveResult,
+  DriveUploadProgress,
+  DriveUploadResult,
 } from '@shared/drive';
 import { toErrorMessage } from '../lib/errors';
+import { DriveActionDialog } from '../components/DriveActionDialog';
+import { DriveMoveDialog } from '../components/DriveMoveDialog';
+import { DriveUploadPanel } from '../components/DriveUploadPanel';
 import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
 
@@ -28,6 +34,19 @@ interface CachedFolder {
   readonly hasMore: boolean;
   readonly total: number;
   readonly cachedAt: number;
+}
+
+type DriveDialogState =
+  | { readonly mode: 'create-folder' }
+  | { readonly mode: 'delete'; readonly entries: readonly DriveEntry[] }
+  | { readonly mode: 'move'; readonly entries: readonly DriveEntry[] }
+  | { readonly mode: 'rename'; readonly entry: DriveEntry };
+
+interface UploadBatchState {
+  readonly active: boolean;
+  readonly items: Readonly<Record<string, DriveUploadProgress>>;
+  readonly result: DriveUploadResult | null;
+  readonly error: string | null;
 }
 
 const PAGE_SIZE = 100;
@@ -112,6 +131,26 @@ function formatDuration(value: number | null): string | null {
   return hours > 0
     ? `${hours}:${paddedMinutes}:${paddedSeconds}`
     : `${minutes}:${paddedSeconds}`;
+}
+
+function dragContainsFiles(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes('Files');
+}
+
+function dragContainsDirectory(items: DataTransferItemList): boolean {
+  return Array.from(items).some((item) => {
+    if (item.kind !== 'file') {
+      return false;
+    }
+
+    const entry = (
+      item as DataTransferItem & {
+        webkitGetAsEntry?: () => { isDirectory: boolean } | null;
+      }
+    ).webkitGetAsEntry?.();
+
+    return Boolean(entry?.isDirectory);
+  });
 }
 
 function FolderIcon() {
@@ -406,11 +445,46 @@ function HomeIcon() {
   );
 }
 
-function LockIcon() {
+function FolderPlusIcon() {
   return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
-      <rect height="5.6" rx="1.5" width="7.6" x="4.2" y="7.1" />
-      <path d="M5.8 7.1V5.6a2.2 2.2 0 0 1 4.4 0v1.5" />
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M2.7 5.3h5.1l1.5 1.8h8v8.1H2.7V5.3Z" />
+      <path d="M2.7 8.1h14.6M10 10.2v4.2M7.9 12.3h4.2" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M10 13V4.7M6.8 7.8 10 4.6l3.2 3.2" />
+      <path d="M3.5 12.7v2.7h13v-2.7" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="m4 13.9-.7 3.1 3.1-.7L15 7.7 11.6 4.3 4 13.9Z" />
+      <path d="m10.7 5.2 3.4 3.4" />
+    </svg>
+  );
+}
+
+function MoveIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M3.3 6.2h5l1.5 1.7h6.9v7.6H3.3V6.2Z" />
+      <path d="M10 9.3v4.2M8.2 11.7 10 13.5l1.8-1.8" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M4.5 6.2h11M8 6.2V4.5h4v1.7M5.8 6.2l.7 9.3h7l.7-9.3M8.5 8.5v4.5M11.5 8.5v4.5" />
     </svg>
   );
 }
@@ -483,7 +557,7 @@ interface DriveWorkspaceContentProps {
   readonly isLoggingIn: boolean;
   readonly isSearchActive: boolean;
   readonly needsLogin: boolean;
-  readonly selectedId: string | null;
+  readonly selectedIds: readonly string[];
   readonly onFileListScroll: (event: UIEvent<HTMLUListElement>) => void;
   readonly onLogin: () => void;
   readonly onOpenSettings: () => void;
@@ -491,7 +565,7 @@ interface DriveWorkspaceContentProps {
   readonly onRetryAccounts: () => void;
   readonly onRetryLoad: () => void;
   readonly onRetrySearch: () => void;
-  readonly onSelectEntry: (entry: DriveEntry) => void;
+  readonly onSelectEntry: (entry: DriveEntry, additive: boolean) => void;
 }
 
 function DriveWorkspaceContent({
@@ -507,7 +581,7 @@ function DriveWorkspaceContent({
   isLoggingIn,
   isSearchActive,
   needsLogin,
-  selectedId,
+  selectedIds,
   onFileListScroll,
   onLogin,
   onOpenSettings,
@@ -629,7 +703,7 @@ function DriveWorkspaceContent({
         onScroll={onFileListScroll}
       >
         {entries.map((entry) => {
-          const isSelected = selectedId === entry.id;
+          const isSelected = selectedIds.includes(entry.id);
           const isFolder = entry.kind === 'folder';
           const fileKind = isFolder ? null : getFileKind(entry.extension);
           const fileKindClass = fileKind ? getFileKindClass(fileKind) : '';
@@ -638,10 +712,11 @@ function DriveWorkspaceContent({
             <li className={styles.fileItem} key={`${entry.kind}-${entry.id}`}>
               <button
                 aria-label={`${entry.name}，${getEntryDescription(entry)}`}
+                aria-pressed={isSelected}
                 className={`${styles.fileRow}${isSelected ? ` ${styles.selected}` : ''}`}
                 type="button"
-                onClick={() => {
-                  onSelectEntry(entry);
+                onClick={(event) => {
+                  onSelectEntry(entry, event.ctrlKey || event.metaKey);
                 }}
                 onDoubleClick={() => {
                   onOpenEntry(entry);
@@ -712,13 +787,20 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [error, setError] = useState<DriveError | null>(null);
   const [query, setQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [dialog, setDialog] = useState<DriveDialogState | null>(null);
+  const [uploadBatch, setUploadBatch] = useState<UploadBatchState | null>(null);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const requestIdRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fileListRef = useRef<HTMLUListElement>(null);
   const fileListScrollTopRef = useRef(0);
   const folderCacheRef = useRef(new Map<string, CachedFolder>());
+  const dragDepthRef = useRef(0);
+  const uploadInFlightRef = useRef(false);
+  const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
+  const showUploadErrorRef = useRef<(message: string) => void>(() => {});
 
   const currentBreadcrumb =
     breadcrumbs[breadcrumbs.length - 1] ?? ROOT_BREADCRUMB;
@@ -730,6 +812,25 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     Boolean(account) &&
     (account?.status === 'empty' || isAuthError) &&
     !isLoading;
+  const selectedEntries = entries.filter((entry) =>
+    selectedIds.includes(entry.id),
+  );
+  const selectedEntry =
+    selectedEntries.length === 1 ? selectedEntries[0] : null;
+  const canMutate =
+    Boolean(account) &&
+    !isLoadingAccounts &&
+    !needsLogin &&
+    !isAuthError &&
+    !accountError &&
+    !isLoading;
+  const isUploading = uploadBatch?.active ?? false;
+  const canDropFiles = canMutate && !isUploading;
+  const uploadItems = uploadBatch
+    ? Object.values(uploadBatch.items).sort(
+        (left, right) => left.fileIndex - right.fileIndex,
+      )
+    : [];
 
   const loadFolder = useCallback(
     async (
@@ -759,7 +860,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         setTotal(cached.total);
         setHasMore(cached.hasMore);
         setBreadcrumbs(cached.breadcrumbs);
-        setSelectedId(null);
+        setSelectedIds([]);
         setActiveQuery(null);
         setError(null);
         setIsLoading(false);
@@ -772,7 +873,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         setIsLoading(true);
         setIsLoadingMore(false);
         setEntries([]);
-        setSelectedId(null);
+        setSelectedIds([]);
       }
 
       setError(null);
@@ -928,6 +1029,45 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     };
   }, [isActive]);
 
+  useEffect(() => {
+    return window.desktop.drive.onUploadProgress((progress) => {
+      setUploadBatch((current) => {
+        if (!current?.active) {
+          return current;
+        }
+
+        return {
+          ...current,
+          items: {
+            ...current.items,
+            [String(progress.fileIndex)]: progress,
+          },
+        };
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (
+      !isActive ||
+      !uploadBatch ||
+      uploadBatch.active ||
+      !uploadBatch.result ||
+      uploadBatch.result.failed > 0 ||
+      uploadBatch.result.uploaded === 0
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setUploadBatch(null);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isActive, uploadBatch]);
+
   const handleSearch = async (searchQuery: string) => {
     if (!account || !searchQuery.trim()) {
       return;
@@ -942,7 +1082,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     setIsLoadingMore(false);
     setError(null);
     setEntries([]);
-    setSelectedId(null);
+    setSelectedIds([]);
     fileListScrollTopRef.current = 0;
 
     if (fileListRef.current) {
@@ -987,6 +1127,232 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       }
     }
   };
+
+  const refreshAfterMutation = async (clearSearch = false) => {
+    folderCacheRef.current.clear();
+    setSelectedIds([]);
+
+    if (!account) {
+      return;
+    }
+
+    if (clearSearch) {
+      setQuery('');
+      setActiveQuery(null);
+      await loadFolder(account.connectionId, currentFolderId, 0, false, true);
+      return;
+    }
+
+    if (activeQuery) {
+      await handleSearch(activeQuery);
+      return;
+    }
+
+    await loadFolder(account.connectionId, currentFolderId, 0, false, true);
+  };
+
+  const showUploadError = (message: string) => {
+    setUploadBatch({
+      active: false,
+      items: {},
+      result: null,
+      error: message,
+    });
+  };
+
+  const runUpload = async (
+    upload: () => Promise<DriveResult<DriveUploadResult>>,
+  ) => {
+    if (!account || uploadInFlightRef.current) {
+      return;
+    }
+
+    uploadInFlightRef.current = true;
+    setUploadBatch({
+      active: true,
+      items: {},
+      result: null,
+      error: null,
+    });
+
+    try {
+      const result = await upload();
+
+      if (!result.ok) {
+        setUploadBatch((current) =>
+          current
+            ? {
+                ...current,
+                active: false,
+                error: result.error.message,
+              }
+            : current,
+        );
+        return;
+      }
+
+      if (result.data.canceled) {
+        setUploadBatch(null);
+        return;
+      }
+
+      setUploadBatch((current) =>
+        current
+          ? {
+              ...current,
+              active: false,
+              result: result.data,
+            }
+          : current,
+      );
+
+      if (result.data.uploaded > 0) {
+        await refreshAfterMutation(true);
+      }
+    } catch (uploadFailure: unknown) {
+      setUploadBatch((current) =>
+        current
+          ? {
+              ...current,
+              active: false,
+              error: toErrorMessage(uploadFailure, '上传失败，请稍后重试。'),
+            }
+          : current,
+      );
+    } finally {
+      uploadInFlightRef.current = false;
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!account) {
+      return;
+    }
+
+    await runUpload(() =>
+      window.desktop.drive.uploadFiles({
+        connectionId: account.connectionId,
+        targetFolderId: currentFolderId,
+      }),
+    );
+  };
+
+  const handleDroppedUpload = async (files: readonly File[]) => {
+    if (!account) {
+      return;
+    }
+
+    await runUpload(() =>
+      window.desktop.drive.uploadDroppedFiles(
+        {
+          connectionId: account.connectionId,
+          targetFolderId: currentFolderId,
+        },
+        files,
+      ),
+    );
+  };
+
+  useEffect(() => {
+    showUploadErrorRef.current = showUploadError;
+    dropUploadRef.current = (files) => {
+      void handleDroppedUpload(files);
+    };
+  });
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    const onDragEnter = (event: globalThis.DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+
+      if (!dataTransfer || !dragContainsFiles(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      dragDepthRef.current += 1;
+      setIsDraggingFiles(true);
+    };
+
+    const onDragOver = (event: globalThis.DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+
+      if (!dataTransfer || !dragContainsFiles(dataTransfer)) {
+        return;
+      }
+
+      event.preventDefault();
+      dataTransfer.dropEffect = canDropFiles ? 'copy' : 'none';
+    };
+
+    const onDragLeave = (event: globalThis.DragEvent) => {
+      if (dragDepthRef.current === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
+      if (dragDepthRef.current === 0) {
+        setIsDraggingFiles(false);
+      }
+    };
+
+    const onDrop = (event: globalThis.DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+
+      if (!dataTransfer) {
+        return;
+      }
+
+      if (!dragContainsFiles(dataTransfer) && dataTransfer.files.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      dragDepthRef.current = 0;
+      setIsDraggingFiles(false);
+
+      if (!canMutate) {
+        showUploadErrorRef.current('请先登录 115 后再上传文件。');
+        return;
+      }
+
+      if (isUploading || uploadInFlightRef.current) {
+        return;
+      }
+
+      const files = Array.from(dataTransfer.files);
+
+      if (files.length === 0) {
+        return;
+      }
+
+      if (dragContainsDirectory(dataTransfer.items)) {
+        showUploadErrorRef.current('暂不支持拖拽文件夹，请拖入文件。');
+        return;
+      }
+
+      dropUploadRef.current(files);
+    };
+
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+      dragDepthRef.current = 0;
+      setIsDraggingFiles(false);
+    };
+  }, [canDropFiles, canMutate, isActive, isUploading]);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1139,14 +1505,77 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     }
   };
 
-  const handleEntryClick = (entry: DriveEntry) => {
-    setSelectedId(entry.id);
+  const handleEntryClick = (entry: DriveEntry, additive: boolean) => {
+    setSelectedIds((current) => {
+      if (!additive) {
+        return [entry.id];
+      }
+
+      return current.includes(entry.id)
+        ? current.filter((id) => id !== entry.id)
+        : [...current, entry.id];
+    });
   };
 
   const handleEntryDoubleClick = (entry: DriveEntry) => {
     if (entry.kind === 'folder') {
       navigateToFolder(entry.id);
     }
+  };
+
+  const handleCreateFolder = async (
+    name: string,
+  ): Promise<DriveResult<null>> => {
+    if (!account) {
+      return {
+        ok: false,
+        error: { code: 'no_account', message: '尚未连接 115 账号。' },
+      };
+    }
+
+    return window.desktop.drive.createFolder({
+      connectionId: account.connectionId,
+      parentId: currentFolderId,
+      name,
+    });
+  };
+
+  const handleRenameEntry = async (
+    entry: DriveEntry,
+    name: string,
+  ): Promise<DriveResult<null>> => {
+    if (!account) {
+      return {
+        ok: false,
+        error: { code: 'no_account', message: '尚未连接 115 账号。' },
+      };
+    }
+
+    return window.desktop.drive.renameEntry({
+      connectionId: account.connectionId,
+      entryId: entry.id,
+      kind: entry.kind,
+      name,
+    });
+  };
+
+  const handleDeleteEntry = async (
+    targets: readonly DriveEntry[],
+  ): Promise<DriveResult<null>> => {
+    if (!account) {
+      return {
+        ok: false,
+        error: { code: 'no_account', message: '尚未连接 115 账号。' },
+      };
+    }
+
+    return window.desktop.drive.deleteEntry({
+      connectionId: account.connectionId,
+      entries: targets.map((entry) => ({
+        entryId: entry.id,
+        parentId: entry.parentId || currentFolderId,
+      })),
+    });
   };
 
   const statusLabel = isLoadingAccounts
@@ -1175,10 +1604,36 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
               <span className={styles.statusDot} aria-hidden="true" />
               {statusLabel}
             </span>
-            <span className={styles.readonlyPill}>
-              <LockIcon />
-              只读
-            </span>
+            <div className={styles.quickActions}>
+              <button
+                aria-label="新建文件夹"
+                className={styles.quickButton}
+                disabled={!canMutate || isUploading}
+                title="新建文件夹"
+                type="button"
+                onClick={() => {
+                  setDialog({ mode: 'create-folder' });
+                }}
+              >
+                <FolderPlusIcon />
+                <span className={styles.quickLabel}>新建文件夹</span>
+              </button>
+              <button
+                aria-label={isUploading ? '正在上传' : '上传到当前目录'}
+                className={`${styles.quickButton} ${styles.quickButtonUpload}`}
+                disabled={!canMutate || isUploading}
+                title="上传文件到当前目录，不会上传到已选文件夹"
+                type="button"
+                onClick={() => {
+                  void handleUpload();
+                }}
+              >
+                <UploadIcon />
+                <span className={styles.quickLabel}>
+                  {isUploading ? '上传中…' : '上传到当前目录'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1278,13 +1733,65 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
             </span>
           </nav>
 
-          {isSearchActive ? (
-            <span className={styles.searchSummary}>
-              在“{currentFolderName}”中搜索“{activeQuery}”
+          <div className={styles.toolbarSide}>
+            <span className={styles.toolbarMeta}>
+              {isSearchActive
+                ? `在“${currentFolderName}”中搜索“${activeQuery}”`
+                : selectedEntries.length > 1
+                  ? `已选 ${selectedEntries.length} 项`
+                  : selectedEntry
+                    ? `已选：${selectedEntry.name}`
+                    : '双击文件夹进入下一层'}
             </span>
-          ) : (
-            <span className={styles.openHint}>双击文件夹进入下一层</span>
-          )}
+
+            {selectedEntries.length > 0 && (
+              <div className={styles.toolbarActions}>
+                <button
+                  className={styles.toolButton}
+                  disabled={
+                    !canMutate || isUploading || selectedEntries.length !== 1
+                  }
+                  type="button"
+                  onClick={() => {
+                    if (selectedEntry) {
+                      setDialog({ mode: 'rename', entry: selectedEntry });
+                    }
+                  }}
+                >
+                  <PencilIcon />
+                  重命名
+                </button>
+                <button
+                  className={styles.toolButton}
+                  disabled={!canMutate || isUploading}
+                  type="button"
+                  onClick={() => {
+                    setDialog({
+                      mode: 'move',
+                      entries: selectedEntries,
+                    });
+                  }}
+                >
+                  <MoveIcon />
+                  移动
+                </button>
+                <button
+                  className={`${styles.toolButton} ${styles.toolButtonDanger}`}
+                  disabled={!canMutate || isUploading}
+                  type="button"
+                  onClick={() => {
+                    setDialog({
+                      mode: 'delete',
+                      entries: selectedEntries,
+                    });
+                  }}
+                >
+                  <TrashIcon />
+                  删除
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         <DriveWorkspaceContent
@@ -1300,7 +1807,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
           isLoggingIn={isLoggingIn}
           isSearchActive={isSearchActive}
           needsLogin={needsLogin}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           onFileListScroll={(event) => {
             fileListScrollTopRef.current = event.currentTarget.scrollTop;
           }}
@@ -1339,7 +1846,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
               <span>
                 <strong>{isSearchActive ? '搜索结果' : '共'}</strong>{' '}
                 {isSearchActive ? `${total} 项 · ` : `${total} 项 · `}
-                只读浏览
+                双击打开文件夹
               </span>
               {hasMore && (
                 <button
@@ -1354,6 +1861,105 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
             </footer>
           )}
       </section>
+
+      {isDraggingFiles && (
+        <output
+          className={`${styles.dropOverlay}${
+            canDropFiles ? '' : ` ${styles.dropOverlayBlocked}`
+          }`}
+        >
+          <div className={styles.dropPanel}>
+            <span className={styles.dropIcon} aria-hidden="true">
+              <UploadIcon />
+            </span>
+            <strong>
+              {canDropFiles
+                ? '松开以上传到当前目录'
+                : needsLogin
+                  ? '请先登录 115'
+                  : isUploading
+                    ? '正在上传，请稍候'
+                    : '当前无法上传'}
+            </strong>
+            <p>文件会保存到「{currentFolderName}」</p>
+            <span className={styles.dropHint}>
+              仅支持文件，暂不支持拖拽文件夹
+            </span>
+          </div>
+        </output>
+      )}
+
+      {dialog?.mode === 'create-folder' && (
+        <DriveActionDialog
+          mode="create-folder"
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCompleted={() => {
+            void refreshAfterMutation(true);
+          }}
+          onSubmit={handleCreateFolder}
+        />
+      )}
+
+      {dialog?.mode === 'rename' && (
+        <DriveActionDialog
+          entryName={dialog.entry.name}
+          initialName={dialog.entry.name}
+          mode="rename"
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCompleted={() => {
+            void refreshAfterMutation(false);
+          }}
+          onSubmit={(name) => handleRenameEntry(dialog.entry, name)}
+        />
+      )}
+
+      {dialog?.mode === 'delete' && (
+        <DriveActionDialog
+          entryName={
+            dialog.entries.length === 1
+              ? (dialog.entries[0]?.name ?? '')
+              : `已选中的 ${dialog.entries.length} 个项目`
+          }
+          itemCount={dialog.entries.length}
+          mode="delete"
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCompleted={() => {
+            void refreshAfterMutation(false);
+          }}
+          onSubmit={() => handleDeleteEntry(dialog.entries)}
+        />
+      )}
+
+      {dialog?.mode === 'move' && account && (
+        <DriveMoveDialog
+          connectionId={account.connectionId}
+          entries={dialog.entries}
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCompleted={() => {
+            void refreshAfterMutation(false);
+          }}
+        />
+      )}
+
+      {uploadBatch && (
+        <DriveUploadPanel
+          active={uploadBatch.active}
+          error={uploadBatch.error}
+          items={uploadItems}
+          result={uploadBatch.result}
+          onClose={() => {
+            setUploadBatch(null);
+          }}
+        />
+      )}
     </main>
   );
 }

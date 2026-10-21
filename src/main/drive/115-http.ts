@@ -8,6 +8,13 @@ export interface DriveHttpResponse {
   readonly body: string;
 }
 
+export interface DriveHttpRequestOptions {
+  readonly method?: 'GET' | 'POST';
+  readonly body?: string;
+  readonly contentType?: string;
+  readonly timeoutMs?: number;
+}
+
 function failure<T>(code: DriveErrorCode, message: string): DriveResult<T> {
   return {
     ok: false,
@@ -26,6 +33,7 @@ function failure<T>(code: DriveErrorCode, message: string): DriveResult<T> {
 export async function request115(
   siteSession: Session,
   url: string,
+  options: DriveHttpRequestOptions = {},
 ): Promise<DriveResult<DriveHttpResponse>> {
   const cookies = await siteSession.cookies.get({ url });
   const cookieHeader = cookies
@@ -46,13 +54,16 @@ export async function request115(
     };
 
     const request = net.request({
-      method: 'GET',
+      method: options.method ?? 'GET',
       url,
       session: siteSession,
     });
 
     request.setHeader('Accept', 'application/json, text/plain, */*');
-    request.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+    request.setHeader(
+      'Content-Type',
+      options.contentType ?? 'application/x-www-form-urlencoded',
+    );
     request.setHeader('Origin', 'https://115.com');
     request.setHeader('Referer', 'https://115.com/');
 
@@ -69,7 +80,7 @@ export async function request115(
     const timeout = setTimeout(() => {
       request.abort();
       finish(failure('network', '115 请求超时，请检查网络或代理。'));
-    }, REQUEST_TIMEOUT_MS);
+    }, options.timeoutMs ?? REQUEST_TIMEOUT_MS);
 
     request.on('response', (response) => {
       const chunks: Buffer[] = [];
@@ -97,6 +108,58 @@ export async function request115(
       finish(failure('network', '无法连接 115，请检查网络或代理。'));
     });
 
-    request.end();
+    if (options.body === undefined) {
+      request.end();
+    } else {
+      request.end(options.body);
+    }
   });
+}
+
+export async function fetch115Json(
+  siteSession: Session,
+  url: string,
+  options?: DriveHttpRequestOptions,
+): Promise<DriveResult<Record<string, unknown>>> {
+  const response = await request115(siteSession, url, options);
+
+  if (!response.ok) {
+    return response;
+  }
+
+  const { status, body: text } = response.data;
+
+  if (status === 401 || status === 403) {
+    return failure('auth_required', '115 登录已失效，请重新登录。');
+  }
+
+  if (status < 200 || status >= 300) {
+    return failure('api', `115 请求失败（HTTP ${status}）。`);
+  }
+
+  let body: unknown;
+
+  try {
+    body = JSON.parse(text) as unknown;
+  } catch {
+    return failure('api', '115 返回了无法解析的响应。');
+  }
+
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return failure('api', '115 返回了异常响应。');
+  }
+
+  const record = body as Record<string, unknown>;
+  const errorMessage =
+    typeof record.error === 'string' ? record.error.trim() : '';
+
+  if (record.state === false) {
+    if (errorMessage.includes('登录')) {
+      return failure('auth_required', '115 登录已失效，请重新登录。');
+    }
+
+    return failure('api', errorMessage || '115 接口返回失败，请稍后重试。');
+  }
+
+  return { ok: true, data: record };
 }
