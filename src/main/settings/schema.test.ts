@@ -66,6 +66,9 @@ describe('application settings migration', () => {
       appearance: {
         theme: 'system',
       },
+      downloads: {
+        directory: null,
+      },
     });
   });
 

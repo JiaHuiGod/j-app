@@ -3,7 +3,9 @@ import styles from './DriveDownloadPanel.module.css';
 
 interface DriveDownloadPanelProps {
   readonly error: string | null;
+  readonly isCancelling: boolean;
   readonly progress: DriveVideoDownloadProgress;
+  readonly onCancel: () => void;
   readonly onClose: () => void;
   readonly onOpenFolder: () => void;
 }
@@ -31,7 +33,9 @@ function isActive(progress: DriveVideoDownloadProgress): boolean {
 
 export function DriveDownloadPanel({
   error,
+  isCancelling,
   progress,
+  onCancel,
   onClose,
   onOpenFolder,
 }: DriveDownloadPanelProps) {
@@ -111,6 +115,18 @@ export function DriveDownloadPanel({
                 </span>
               )}
           </div>
+          {progress.status === 'downloading' && (
+            <div className={styles.actions}>
+              <button
+                className={styles.cancelButton}
+                disabled={isCancelling}
+                type="button"
+                onClick={onCancel}
+              >
+                {isCancelling ? '取消中…' : '取消下载'}
+              </button>
+            </div>
+          )}
         </>
       )}
 

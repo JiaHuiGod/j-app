@@ -145,6 +145,35 @@
   outline-offset: 1px;
 }
 
+.cancelButton {
+  height: 27px;
+  padding: 0 10px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 650;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.cancelButton:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: rgb(180 50 54 / 25%);
+  background: rgb(180 50 54 / 4%);
+}
+
+.cancelButton:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 1px;
+}
+
+.cancelButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .error {
   padding: 8px 9px;
   margin: 10px 0 0;

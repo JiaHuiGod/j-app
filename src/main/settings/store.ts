@@ -1,5 +1,13 @@
 import { constants } from 'node:fs';
-import { access, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { app } from 'electron';
 import type { ThemePreference } from '@shared/appearance';
@@ -178,6 +186,44 @@ export async function saveThemePreference(
   }));
 
   return theme;
+}
+
+export async function getDownloadDirectory(): Promise<string | null> {
+  return (await loadSettings()).downloads.directory;
+}
+
+export async function saveDownloadDirectory(
+  input: unknown,
+): Promise<string | null> {
+  let directory: string | null = null;
+
+  if (input !== null) {
+    if (typeof input !== 'string' || input.length > 4096) {
+      throw new Error('下载目录格式不正确。');
+    }
+
+    directory = input.trim();
+
+    if (!directory || !path.isAbsolute(directory)) {
+      throw new Error('下载目录必须是绝对路径。');
+    }
+
+    const info = await stat(directory).catch(() => null);
+
+    if (!info?.isDirectory()) {
+      throw new Error('下载目录不存在或不是文件夹。');
+    }
+  }
+
+  await updateSettings((current) => ({
+    ...current,
+    downloads: {
+      ...current.downloads,
+      directory,
+    },
+  }));
+
+  return directory;
 }
 
 export async function getSiteConnections(): Promise<readonly SiteConnection[]> {

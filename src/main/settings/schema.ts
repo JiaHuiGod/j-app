@@ -127,6 +127,12 @@ const appearanceSchema = z.object({
   theme: z.enum(THEME_PREFERENCES),
 });
 
+const downloadsSchema = z
+  .object({
+    directory: z.string().trim().max(4096).nullable(),
+  })
+  .default({ directory: null });
+
 const appSettingsSchema = z.object({
   schemaVersion: z.literal(3),
   network: z.object({
@@ -134,6 +140,7 @@ const appSettingsSchema = z.object({
   }),
   connections: connectionsSchema,
   appearance: appearanceSchema,
+  downloads: downloadsSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -181,6 +188,9 @@ export function parseAppSettings(input: unknown): AppSettings {
       appearance: {
         theme: 'system',
       },
+      downloads: {
+        directory: null,
+      },
     };
   }
 
@@ -202,6 +212,9 @@ export function parseAppSettings(input: unknown): AppSettings {
       connections: versionTwoResult.data.connections,
       appearance: {
         theme: 'system',
+      },
+      downloads: {
+        directory: null,
       },
     };
   }

@@ -18,6 +18,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   appearance: {
     theme: 'light',
   },
+  downloads: {
+    directory: null,
+  },
 };
 
 export function createDefaultAppSettings(): AppSettings {

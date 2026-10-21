@@ -23,6 +23,9 @@ export interface AppSettings {
   readonly appearance: {
     readonly theme: ThemePreference;
   };
+  readonly downloads: {
+    readonly directory: string | null;
+  };
 }
 
 export type ProxyTestTargetId = 'google' | 'github';

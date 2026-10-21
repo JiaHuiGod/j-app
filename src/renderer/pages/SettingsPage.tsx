@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SiteConnectionSummary } from '@shared/connections';
 import { AddSiteDialog } from '../components/AddSiteDialog';
 import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
+import { DownloadSettings } from '../components/DownloadSettings';
 import { GlobeIcon } from '../components/GlobeIcon';
 import { ThemeSettings } from '../components/ThemeSettings';
 import { toErrorMessage } from '../lib/errors';
@@ -177,11 +178,11 @@ export function SettingsPage() {
       <header className={styles.header}>
         <div className={styles.heading}>
           <p className={page.eyebrow}>
-            Preferences / Appearance &amp; Connections
+            Preferences / Appearance, Downloads &amp; Connections
           </p>
           <h1 id="settings-page-title">设置。</h1>
           <p className={styles.headingLede}>
-            调整应用外观，并管理需要登录的站点。每个站点使用独立的持久会话保存
+            调整应用外观、默认下载目录，并管理需要登录的站点。每个站点使用独立的持久会话保存
             Cookie，登录信息不会进入页面或配置文件。
           </p>
         </div>
@@ -198,6 +199,7 @@ export function SettingsPage() {
       </header>
 
       <ThemeSettings />
+      <DownloadSettings />
 
       <section aria-labelledby="connections-title" className={styles.card}>
         <header className={styles.cardHeader}>

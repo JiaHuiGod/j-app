@@ -63,6 +63,15 @@ const settings = Object.freeze<SettingsApi>({
   testProxy: (proxy: ProxySettings) => {
     return ipcRenderer.invoke(IpcChannel.TestProxySettings, proxy);
   },
+  getDownloadDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.GetDownloadDirectory);
+  },
+  chooseDownloadDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.ChooseDownloadDirectory);
+  },
+  clearDownloadDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.ClearDownloadDirectory);
+  },
 });
 
 const connections = Object.freeze<ConnectionsApi>({
@@ -137,6 +146,9 @@ const drive = Object.freeze<DriveApi>({
   },
   downloadVideo: (input: DriveVideoDownloadInput) => {
     return ipcRenderer.invoke(IpcChannel.DownloadDriveVideo, input);
+  },
+  cancelDownload: (downloadId: string) => {
+    return ipcRenderer.invoke(IpcChannel.CancelDriveDownload, downloadId);
   },
   openDownloadFolder: (downloadId: string) => {
     return ipcRenderer.invoke(IpcChannel.OpenDriveDownloadFolder, downloadId);

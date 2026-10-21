@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,7 +10,11 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppearanceState } from '@shared/appearance';
 import type { SiteConnectionSummary } from '@shared/connections';
-import type { DriveAccount, DriveListing } from '@shared/drive';
+import type {
+  DriveAccount,
+  DriveListing,
+  DriveVideoDownloadProgress,
+} from '@shared/drive';
 import type {
   AppearanceApi,
   AppInfo,
@@ -138,6 +143,15 @@ let getProxy: ReturnType<typeof vi.fn<() => Promise<ProxySettings>>>;
 let saveProxy: ReturnType<
   typeof vi.fn<(settings: ProxySettings) => Promise<void>>
 >;
+let getDownloadDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['getDownloadDirectory']>
+>;
+let chooseDownloadDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['chooseDownloadDirectory']>
+>;
+let clearDownloadDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['clearDownloadDirectory']>
+>;
 let toggleMaximize: ReturnType<typeof vi.fn<() => void>>;
 let restartApp: ReturnType<typeof vi.fn<() => void>>;
 let listConnections: ReturnType<typeof vi.fn<ConnectionsApi['list']>>;
@@ -162,6 +176,7 @@ let uploadDroppedDriveFiles: ReturnType<
 let listOfflineTasks: ReturnType<typeof vi.fn<DriveApi['listOfflineTasks']>>;
 let addOfflineTasks: ReturnType<typeof vi.fn<DriveApi['addOfflineTasks']>>;
 let downloadDriveVideo: ReturnType<typeof vi.fn<DriveApi['downloadVideo']>>;
+let cancelDriveDownload: ReturnType<typeof vi.fn<DriveApi['cancelDownload']>>;
 let openDriveDownloadFolder: ReturnType<
   typeof vi.fn<DriveApi['openDownloadFolder']>
 >;
@@ -181,6 +196,15 @@ beforeEach(() => {
     .mockResolvedValue(proxySettings);
   saveProxy = vi
     .fn<(settings: ProxySettings) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  getDownloadDirectory = vi
+    .fn<SettingsApi['getDownloadDirectory']>()
+    .mockResolvedValue(null);
+  chooseDownloadDirectory = vi
+    .fn<SettingsApi['chooseDownloadDirectory']>()
+    .mockResolvedValue('C:\\Downloads');
+  clearDownloadDirectory = vi
+    .fn<SettingsApi['clearDownloadDirectory']>()
     .mockResolvedValue(undefined);
   toggleMaximize = vi.fn<() => void>();
   restartApp = vi.fn<() => void>();
@@ -275,6 +299,9 @@ beforeEach(() => {
       bytes: 0,
     },
   });
+  cancelDriveDownload = vi
+    .fn<DriveApi['cancelDownload']>()
+    .mockResolvedValue({ ok: true, data: null });
   onDriveVideoDownloadProgress = vi
     .fn<DriveApi['onVideoDownloadProgress']>()
     .mockReturnValue(() => {});
@@ -302,6 +329,9 @@ beforeEach(() => {
       testedAt: new Date().toISOString(),
       results: [],
     }),
+    getDownloadDirectory,
+    chooseDownloadDirectory,
+    clearDownloadDirectory,
   };
   const connections: ConnectionsApi = {
     list: listConnections,
@@ -324,6 +354,7 @@ beforeEach(() => {
     listOfflineTasks,
     addOfflineTasks,
     downloadVideo: downloadDriveVideo,
+    cancelDownload: cancelDriveDownload,
     openDownloadFolder: openDriveDownloadFolder,
     onUploadProgress: onDriveUploadProgress,
     onVideoDownloadProgress: onDriveVideoDownloadProgress,
@@ -1041,6 +1072,83 @@ describe('App', () => {
     });
   });
 
+  it('cancels an active video download', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: driveAccount.connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '77',
+            parentId: '0',
+            name: 'movie.mp4',
+            kind: 'file',
+            size: 100,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 120,
+            pickcode: 'video-pickcode',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+    downloadDriveVideo.mockReturnValue(new Promise(() => {}));
+
+    let emitProgress: ((progress: DriveVideoDownloadProgress) => void) | null =
+      null;
+
+    onDriveVideoDownloadProgress.mockImplementation((listener) => {
+      emitProgress = listener;
+      return () => {};
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('movie.mp4'));
+    fireEvent.click(screen.getByRole('button', { name: '下载' }));
+
+    await waitFor(() => {
+      expect(downloadDriveVideo).toHaveBeenCalledOnce();
+    });
+
+    const downloadId = downloadDriveVideo.mock.calls[0]?.[0].downloadId;
+
+    if (!downloadId || !emitProgress) {
+      throw new Error('download did not start');
+    }
+
+    act(() => {
+      emitProgress?.({
+        downloadId,
+        fileName: 'movie.mp4',
+        receivedBytes: 50,
+        totalBytes: 100,
+        bytesPerSecond: 10,
+        status: 'downloading',
+      });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: '取消下载' }));
+
+    await waitFor(() => {
+      expect(cancelDriveDownload).toHaveBeenCalledWith(downloadId);
+    });
+  });
+
   it('searches only inside the current 115 folder', async () => {
     listDriveAccounts.mockResolvedValue({
       ok: true,
@@ -1120,6 +1228,43 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: '登录 115' }));
 
     expect(loginConnection).toHaveBeenCalledWith(driveAccount.connectionId);
+  });
+
+  it('rechecks the 115 session after logging in from settings', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder
+      .mockResolvedValueOnce({
+        ok: false,
+        error: {
+          code: 'auth_required',
+          message: '115 登录已失效，请重新登录。',
+        },
+      })
+      .mockResolvedValue({
+        ok: true,
+        data: driveRootListing,
+      });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    await screen.findByRole('heading', { name: '115 登录已失效' });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByRole('heading', { name: '设置。' });
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+
+    expect(await screen.findByText('readme.txt')).toBeDefined();
+    expect(
+      screen.queryByRole('heading', { name: '115 登录已失效' }),
+    ).toBeNull();
+    expect(listDriveAccounts).toHaveBeenCalledTimes(2);
   });
 
   it('adds a site connection from the settings page', async () => {
@@ -1262,5 +1407,22 @@ describe('App', () => {
     expect(
       await screen.findByRole('radio', { name: /深色/, checked: true }),
     ).toBeDefined();
+  });
+
+  it('sets the default download directory from the settings page', async () => {
+    chooseDownloadDirectory.mockResolvedValueOnce('D:\\Downloads');
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    fireEvent.click(await screen.findByRole('button', { name: '选择目录' }));
+
+    await waitFor(() => {
+      expect(chooseDownloadDirectory).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText('D:\\Downloads')).toBeDefined();
   });
 });

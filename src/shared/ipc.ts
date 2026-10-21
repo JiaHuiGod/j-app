@@ -41,6 +41,9 @@ export const IpcChannel = {
   GetProxySettings: 'settings:get-proxy',
   SaveProxySettings: 'settings:save-proxy',
   TestProxySettings: 'settings:test-proxy',
+  GetDownloadDirectory: 'settings:get-download-directory',
+  ChooseDownloadDirectory: 'settings:choose-download-directory',
+  ClearDownloadDirectory: 'settings:clear-download-directory',
   GetAppearance: 'appearance:get',
   SetAppearanceTheme: 'appearance:set-theme',
   RestartApp: 'app:restart',
@@ -62,6 +65,7 @@ export const IpcChannel = {
   ListDriveOfflineTasks: 'drive:offline-list',
   AddDriveOfflineTasks: 'drive:offline-add',
   DownloadDriveVideo: 'drive:video-download',
+  CancelDriveDownload: 'drive:video-cancel',
   OpenDriveDownloadFolder: 'drive:video-open-folder',
   DriveUploadProgress: 'drive:upload-progress',
   DriveVideoDownloadProgress: 'drive:video-download-progress',
@@ -90,6 +94,9 @@ export interface SettingsApi {
   getProxy: () => Promise<ProxySettings>;
   saveProxy: (settings: ProxySettings) => Promise<void>;
   testProxy: (settings: ProxySettings) => Promise<ProxyTestResult>;
+  getDownloadDirectory: () => Promise<string | null>;
+  chooseDownloadDirectory: () => Promise<string | null>;
+  clearDownloadDirectory: () => Promise<void>;
 }
 
 export interface AppearanceApi {
@@ -136,6 +143,7 @@ export interface DriveApi {
   downloadVideo: (
     input: DriveVideoDownloadInput,
   ) => Promise<DriveResult<DriveVideoDownloadResult>>;
+  cancelDownload: (downloadId: string) => Promise<DriveResult<null>>;
   openDownloadFolder: (downloadId: string) => Promise<DriveResult<null>>;
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,

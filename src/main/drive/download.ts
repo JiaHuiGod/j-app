@@ -13,6 +13,7 @@ import { parseSiteConnectionId } from '../settings/schema';
 import { getMainWindow } from '../window';
 import { getAccountSession } from './115';
 import { fetch115JsonDetailed } from './115-http';
+import { getDownloadDirectory } from '../settings/store';
 
 const VIDEO_ENDPOINT = 'https://webapi.115.com/files/video?pickcode=';
 const MAX_PICKCODE_LENGTH = 128;
@@ -42,6 +43,14 @@ const PERSISTENT_COOKIE_NAMES = new Set([
   '115_lang',
 ]);
 const completedDownloads = new Map<string, string>();
+const activeDownloads = new Map<string, AbortController>();
+
+class DownloadCanceledError extends Error {
+  constructor() {
+    super('视频下载已取消。');
+    this.name = 'DownloadCanceledError';
+  }
+}
 
 interface ParsedDownloadRequest {
   readonly downloadId: string;
@@ -292,7 +301,12 @@ async function downloadToFile(
   sourceSetCookie: readonly string[],
   destination: string,
   requestInfo: ParsedDownloadRequest,
+  signal: AbortSignal,
 ): Promise<number> {
+  if (signal.aborted) {
+    throw new DownloadCanceledError();
+  }
+
   const cookieHeader = await getDownloadCookieHeader(
     siteSession,
     sourceUrl,
@@ -314,6 +328,7 @@ async function downloadToFile(
   try {
     await new Promise<void>((resolve, reject) => {
       let settled = false;
+      let cleanupAbort = () => {};
 
       const request = net.request({
         method: 'GET',
@@ -327,10 +342,20 @@ async function downloadToFile(
         }
 
         settled = true;
+        cleanupAbort();
         request.abort();
         stream.destroy();
         reject(error);
       };
+
+      const onAbort = () => {
+        fail(new DownloadCanceledError());
+      };
+
+      cleanupAbort = () => {
+        signal.removeEventListener('abort', onAbort);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
 
       request.setHeader('Accept', '*/*');
       request.setHeader('Referer', 'https://115.com/');
@@ -420,6 +445,7 @@ async function downloadToFile(
         stream.on('finish', () => {
           if (!settled) {
             settled = true;
+            cleanupAbort();
             resolve();
           }
         });
@@ -432,8 +458,13 @@ async function downloadToFile(
       request.end();
     });
 
+    if (signal.aborted) {
+      throw new DownloadCanceledError();
+    }
+
     await fs.rm(destination, { force: true });
     await fs.rename(tempPath, destination);
+    await fs.rm(tempPath, { force: true });
 
     sendProgress(sender, {
       downloadId: requestInfo.downloadId,
@@ -446,6 +477,13 @@ async function downloadToFile(
 
     return receivedBytes;
   } catch (error) {
+    if (!stream.closed) {
+      await new Promise<void>((resolve) => {
+        stream.once('close', resolve);
+        stream.destroy();
+      });
+    }
+
     await fs.rm(tempPath, { force: true });
     throw error;
   }
@@ -491,9 +529,12 @@ export async function download115Video(
   }
 
   const parent = getMainWindow();
+  const defaultDirectory = await getDownloadDirectory().catch(() => null);
   const options = {
     title: '保存视频',
-    defaultPath: request.fileName,
+    defaultPath: defaultDirectory
+      ? path.join(defaultDirectory, request.fileName)
+      : request.fileName,
     filters: [
       { name: '视频文件', extensions: VIDEO_EXTENSIONS },
       { name: '所有文件', extensions: ['*'] },
@@ -523,6 +564,9 @@ export async function download115Video(
     };
   }
 
+  const controller = new AbortController();
+  activeDownloads.set(request.downloadId, controller);
+
   try {
     const bytes = await downloadToFile(
       sender,
@@ -531,6 +575,7 @@ export async function download115Video(
       source.data.setCookie,
       selection.filePath,
       request,
+      controller.signal,
     );
 
     completedDownloads.set(request.downloadId, selection.filePath);
@@ -545,6 +590,26 @@ export async function download115Video(
       },
     };
   } catch (error) {
+    if (controller.signal.aborted) {
+      sendProgress(sender, {
+        downloadId: request.downloadId,
+        fileName: request.fileName,
+        receivedBytes: 0,
+        totalBytes: 0,
+        status: 'canceled',
+      });
+
+      return {
+        ok: true,
+        data: {
+          canceled: true,
+          fileName: request.fileName,
+          filePath: null,
+          bytes: 0,
+        },
+      };
+    }
+
     const message = errorMessage(error);
 
     sendProgress(sender, {
@@ -563,7 +628,39 @@ export async function download115Video(
         message,
       },
     };
+  } finally {
+    activeDownloads.delete(request.downloadId);
   }
+}
+
+export function cancel115Download(value: unknown): DriveResult<null> {
+  const downloadId = typeof value === 'string' ? value.trim() : '';
+
+  if (!downloadId || downloadId.length > MAX_DOWNLOAD_ID_LENGTH) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_input',
+        message: '下载任务参数不正确。',
+      },
+    };
+  }
+
+  const controller = activeDownloads.get(downloadId);
+
+  if (!controller) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_input',
+        message: '当前没有可取消的下载。',
+      },
+    };
+  }
+
+  controller.abort();
+
+  return { ok: true, data: null };
 }
 
 export function open115DownloadFolder(value: unknown): DriveResult<null> {

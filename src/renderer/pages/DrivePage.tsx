@@ -825,8 +825,14 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     useState<DriveVideoDownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [defaultDownloadDirectory, setDefaultDownloadDirectory] = useState<
+    string | null
+  >(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const requestIdRef = useRef(0);
+  const didInitialLoadRef = useRef(false);
+  const authStaleRef = useRef(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fileListRef = useRef<HTMLUListElement>(null);
   const fileListScrollTopRef = useRef(0);
@@ -835,6 +841,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const uploadInFlightRef = useRef(false);
   const offlineSubmittedRef = useRef(false);
   const activeDownloadIdRef = useRef<string | null>(null);
+  const cancelRequestedRef = useRef(false);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
 
@@ -993,6 +1000,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   );
 
   const loadAccounts = useCallback(async () => {
+    folderCacheRef.current.clear();
     setIsLoadingAccounts(true);
     setAccountError('');
     setError(null);
@@ -1014,7 +1022,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       }
 
       if (firstAccount.status === 'connected') {
-        await loadFolder(firstAccount.connectionId, '0');
+        await loadFolder(firstAccount.connectionId, '0', 0, false, true);
       } else {
         setBreadcrumbs([ROOT_BREADCRUMB]);
         setEntries([]);
@@ -1032,8 +1040,25 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   }, [loadFolder]);
 
   useEffect(() => {
-    void loadAccounts();
-  }, [loadAccounts]);
+    authStaleRef.current =
+      !account || account.status !== 'connected' || needsLogin || isAuthError;
+  }, [account, isAuthError, needsLogin]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    if (!didInitialLoadRef.current) {
+      didInitialLoadRef.current = true;
+      void loadAccounts();
+      return;
+    }
+
+    if (authStaleRef.current) {
+      void loadAccounts();
+    }
+  }, [isActive, loadAccounts]);
 
   useEffect(() => {
     if (!isActive) {
@@ -1071,6 +1096,29 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   }, [isActive]);
 
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    void window.desktop.settings
+      .getDownloadDirectory()
+      .then((directory) => {
+        if (isCurrent) {
+          setDefaultDownloadDirectory(directory);
+        }
+      })
+      .catch(() => {
+        // The save dialog still works without a preset.
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isActive]);
+
+  useEffect(() => {
     return window.desktop.drive.onUploadProgress((progress) => {
       setUploadBatch((current) => {
         if (!current?.active) {
@@ -1095,6 +1143,9 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       }
 
       if (progress.status === 'canceled') {
+        setDownloadProgress(progress);
+        setIsDownloading(false);
+        setIsCancelling(false);
         return;
       }
 
@@ -1102,8 +1153,10 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
 
       if (progress.status === 'failed') {
         setDownloadError(progress.error ?? '视频下载失败，请稍后重试。');
+        setIsCancelling(false);
       } else if (progress.status === 'success') {
         setDownloadError(null);
+        setIsCancelling(false);
       }
     });
   }, []);
@@ -1322,6 +1375,8 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     const downloadId = createDownloadId();
 
     activeDownloadIdRef.current = downloadId;
+    cancelRequestedRef.current = false;
+    setIsCancelling(false);
     setIsDownloading(true);
     setDownloadError(null);
     setDownloadProgress({
@@ -1351,14 +1406,30 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
             : null,
         );
         setDownloadError(result.error.message);
+        setIsCancelling(false);
         return;
       }
 
       if (result.data.canceled) {
-        activeDownloadIdRef.current = null;
-        setDownloadProgress(null);
+        const wasCanceled = cancelRequestedRef.current;
+
+        cancelRequestedRef.current = false;
+        setIsCancelling(false);
+
+        if (wasCanceled) {
+          setDownloadProgress((current) =>
+            current ? { ...current, status: 'canceled' } : null,
+          );
+        } else {
+          activeDownloadIdRef.current = null;
+          setDownloadProgress(null);
+        }
+
         return;
       }
+
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
 
       setDownloadProgress((current) =>
         current
@@ -1387,8 +1458,38 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
           : null,
       );
       setDownloadError(message);
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleCancelDownload = async () => {
+    if (!downloadProgress || isCancelling) {
+      return;
+    }
+
+    cancelRequestedRef.current = true;
+    setIsCancelling(true);
+    setDownloadError(null);
+
+    try {
+      const result = await window.desktop.drive.cancelDownload(
+        downloadProgress.downloadId,
+      );
+
+      if (!result.ok) {
+        cancelRequestedRef.current = false;
+        setIsCancelling(false);
+        setDownloadError(result.error.message);
+      }
+    } catch (cancelFailure: unknown) {
+      cancelRequestedRef.current = false;
+      setIsCancelling(false);
+      setDownloadError(
+        toErrorMessage(cancelFailure, '取消下载失败，请稍后重试。'),
+      );
     }
   };
 
@@ -1892,7 +1993,9 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                 : selectedEntries.length > 1
                   ? `已选 ${selectedEntries.length} 项`
                   : selectedEntry
-                    ? `已选：${selectedEntry.name}`
+                    ? selectedVideo
+                      ? `已选：${selectedEntry.name} · 下载到 ${defaultDownloadDirectory ?? '系统默认位置'}`
+                      : `已选：${selectedEntry.name}`
                     : '双击文件夹进入下一层'}
             </span>
 
@@ -1909,7 +2012,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                     }
                     title={
                       selectedVideo.pickcode
-                        ? '下载视频到本地'
+                        ? `下载视频到 ${defaultDownloadDirectory ?? '系统默认位置'}`
                         : '该视频缺少下载标识'
                     }
                     type="button"
@@ -2165,9 +2268,15 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       {downloadProgress && (
         <DriveDownloadPanel
           error={downloadError}
+          isCancelling={isCancelling}
           progress={downloadProgress}
+          onCancel={() => {
+            void handleCancelDownload();
+          }}
           onClose={() => {
             activeDownloadIdRef.current = null;
+            cancelRequestedRef.current = false;
+            setIsCancelling(false);
             setDownloadProgress(null);
             setDownloadError(null);
           }}
