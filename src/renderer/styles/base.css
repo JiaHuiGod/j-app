@@ -70,8 +70,7 @@ code {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: clamp(4px, 0.6vw, 8px) clamp(20px, 3.2vw, 42px)
-    clamp(12px, 1.8vw, 20px);
+  padding: clamp(4px, 0.6vw, 8px) clamp(20px, 3.2vw, 42px) 2px;
   overflow-y: auto;
   scrollbar-color: rgb(23 25 31 / 18%) transparent;
   scrollbar-width: thin;
@@ -99,17 +98,19 @@ h1 {
 
 .app-footer {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 4px 16px;
   width: 100%;
   max-width: 1180px;
-  padding-top: 8px;
+  min-height: 26px;
+  padding: 0 2px;
   margin-inline: auto;
   color: var(--muted);
   font-size: 0.64rem;
-  line-height: 1.35;
+  line-height: 1.1;
   border-top: 1px solid var(--line);
 }
 
@@ -153,7 +154,7 @@ h1 {
 
 @media (max-width: 680px) {
   .app-shell {
-    padding: 6px 18px 14px;
+    padding: 6px 18px 2px;
   }
 
   h1 {
@@ -162,6 +163,7 @@ h1 {
 
   .app-footer {
     gap: 3px 10px;
+    min-height: 24px;
     font-size: 0.58rem;
   }
 }
