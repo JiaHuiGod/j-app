@@ -13,6 +13,7 @@ import type {
   DriveMoveInput,
   DriveOfflineAddInput,
   DriveOfflineListInput,
+  DrivePlaybackInput,
   DriveRenameInput,
   DriveSearchInput,
   DriveUploadInput,
@@ -152,6 +153,12 @@ const drive = Object.freeze<DriveApi>({
   },
   openDownloadFolder: (downloadId: string) => {
     return ipcRenderer.invoke(IpcChannel.OpenDriveDownloadFolder, downloadId);
+  },
+  startPlayback: (input: DrivePlaybackInput) => {
+    return ipcRenderer.invoke(IpcChannel.StartDrivePlayback, input);
+  },
+  stopPlayback: (sessionId: string) => {
+    return ipcRenderer.invoke(IpcChannel.StopDrivePlayback, sessionId);
   },
   onUploadProgress: (listener: (progress: DriveUploadProgress) => void) => {
     const handler = (

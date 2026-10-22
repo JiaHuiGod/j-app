@@ -16,16 +16,17 @@
 - 新建文件夹、重命名、移动、删除；
 - 离线任务：提交 magnet / ED2K / HTTP / FTP 链接到当前目录，查看本次提交的任务和进度；
 - 视频下载：选中视频文件后获取 115 下载地址，通过系统保存对话框下载到本地，并显示进度；默认目录在设置页配置；
+- 视频播放：使用接口返回的 `video_url`（m3u8），通过主进程本机代理和 hls.js 在线播放；
 - 未登录、登录失效、无账号、空目录、网络错误均有独立状态；
 - 登录失效时可以直接打开现有登录窗口重新登录；从设置页完成登录或更新 Cookie 后，返回网盘页会自动重新检测会话；
 
-视频接口同时返回的 `video_url`（m3u8 播放地址）暂不展示，预留给后续播放功能；当前只实现下载。
+视频接口同时返回 `origin_file_url` 和 `video_url`；前者用于下载，后者用于 hls.js 播放，下载和播放使用独立的会话与 Cookie 处理。
 
 ## 2. 架构
 
 ```text
 DrivePage
-  │ DriveApi：账号、目录、搜索、文件操作、上传、离线任务、视频下载
+  │ DriveApi：账号、目录、搜索、文件操作、上传、离线任务、视频下载与播放
   ▼
 preload
   │ typed IPC
@@ -64,6 +65,7 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 | `src/main/drive/offline.ts`                           | 离线任务签名、提交和任务列表            |
 | `src/main/drive/offline-mapper.ts`                    | 离线任务状态、进度和分页归一化          |
 | `src/main/drive/download.ts`                          | 视频下载地址、保存对话框和流式下载      |
+| `src/main/drive/playback.ts`                          | 播放会话、本机代理与 m3u8 重写          |
 | `src/main/drive/upload.ts`                            | 115 上传初始化、OSS 流式上传与进度      |
 | `src/main/drive/mapper.ts`                            | 115 响应归一化、HTML 标签清理、分页状态 |
 | `src/main/drive/ipc.ts`                               | 网盘 IPC 处理器                         |
@@ -75,6 +77,7 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 | `src/renderer/components/DriveUploadPanel.tsx`        | 上传进度面板                            |
 | `src/renderer/components/DriveOfflineDialog.tsx`      | 离线任务提交与列表                      |
 | `src/renderer/components/DriveDownloadPanel.tsx`      | 视频下载进度与结果                      |
+| `src/renderer/components/DrivePlayerDialog.tsx`       | HLS 视频播放器                          |
 | `src/renderer/components/DownloadSettings.tsx`        | 设置页默认下载目录                      |
 
 ## 3. 账号与登录
@@ -175,7 +178,7 @@ GET https://webapi.115.com/files/video?pickcode=<pc>
 
 - 目录列表归一化时保留 115 的 `pc` 字段为 `pickcode`；
 - 选中单个视频文件后显示“下载”，主进程用 `pickcode` 获取地址；
-- 接口返回的 `origin_file_url` 用于下载，`video_url`（m3u8）保留给后续播放功能；
+- 接口返回的 `origin_file_url` 用于下载，`video_url`（m3u8）用于在线播放；
 - 视频接口会通过 `Set-Cookie` 返回一个**一次性的下载校验 Cookie**；主进程解析该响应头，与站点 Cookie 合并后仅用于本次下载请求；
 - 该下载校验 Cookie 不写入持久缓存，使用后从站点分区 session 清理；每次获取视频地址都会拿到新值；
 - 主进程先弹出系统保存对话框，默认位置取设置页配置的下载目录；用户仍可在对话框中临时选择其他目录；
@@ -184,6 +187,21 @@ GET https://webapi.115.com/files/video?pickcode=<pc>
 - 下载完成记录保存在主进程内，按下载 ID 打开文件所在目录，不接受 renderer 传入任意路径；
 - 下载请求只向 115 域携带站点 Cookie，不把下载地址或 Cookie 返回 renderer；
 - 目标路径只由主进程保存对话框产生。
+
+### 视频播放
+
+```text
+GET https://webapi.115.com/files/video?pickcode=<pc>
+```
+
+- 选中视频后点击“播放”或双击视频文件，renderer 调用 `startPlayback`；
+- 主进程获取 `video_url`，建立播放会话和仅监听 `127.0.0.1` 的 HTTP 代理；
+- renderer 只拿到本地代理地址，用 hls.js 播放；
+- 主进程代理 m3u8、子播放列表、分片和加密密钥，并重写其中的 URI；
+- 播放请求携带站点 Cookie、一次性 Set-Cookie、`Referer: https://115.com/` 和站点 UA；
+- 提供 Range 透传和 CORS，响应不暴露真实 115 地址；
+- 关闭播放器时停止会话、中止未完成请求并释放资源映射；
+- 播放地址过期或加载失败时，可以重新获取地址。
 
 ### 离线任务
 
@@ -236,7 +254,9 @@ type DriveResult<T> =
 - 上传完成后显示逐文件结果面板；全部成功时约 2.6 秒后自动消失，有失败项时保留到用户手动关闭；
 - 如果上传完成时不在网盘页，成功结果面板不会开始自动消失；回到网盘页后再开始计时；
 - 离线任务弹窗支持多链接提交，可通过目录选择器更改保存目录；任务列表只显示本次提交的链接对应的状态、进度和速率；
-- 选中单个视频文件时显示“下载”，选择保存位置后显示进度和实时下载速度，可随时取消；下载完成后可点击“打开下载目录”；
+- 选中单个视频文件时显示“播放”和“下载”；也可双击视频文件直接播放；
+- 播放器支持暂停、拖动进度、音量、倍速和全屏，关闭时释放播放会话；
+- 选择保存位置后显示下载进度和实时下载速度，可随时取消；下载完成后可点击“打开下载目录”；
 - 设置页可以配置默认下载目录；网盘页在选中视频时显示当前默认目录，保存对话框仍可临时更改；
 - 搜索只在当前目录内生效，结果仍显示当前面包屑，并显示搜索关键词；
 - 双击文件夹进入下一层；键盘聚焦文件夹后按 Enter 也可进入；
@@ -251,6 +271,10 @@ type DriveResult<T> =
 - 目录和文件操作固定访问 `https://webapi.115.com`，上传初始化固定访问 `https://uplb.115.com`；
 - 离线任务固定访问 `https://115.com` 和 `https://webapi.115.com/offine/downpath`；
 - 离线链接只接受 `magnet:`、`ed2k:`、`http:`、`https:`、`ftp:`，长度上限 4096，单次最多 20 条；
+- 视频播放代理只绑定 `127.0.0.1`，使用随机端口和不可猜测的播放会话 ID；
+- renderer 只获得本地代理地址，不获得真实 115 m3u8/分片地址；
+- 代理只允许访问当前会话已登记的资源，不接受任意上游 URL；
+- 播放 Cookie 只在当前播放会话内使用，不持久化；
 - 视频下载只接受列表中的 `pickcode` 格式，下载地址仅允许 `http:` / `https:`；
 - 视频目标路径只来自系统保存对话框，不接受 renderer 传入的本地路径；
 - 视频下载使用站点分区 session；接口返回的一次性下载 Cookie 只合并到本次下载请求，不持久化；
@@ -279,11 +303,13 @@ type DriveResult<T> =
 - 已实际提交无效的离线单条和多条链接，验证单条显示“错误的链接”，多条会按链接分别返回错误；界面测试覆盖不同链接对应不同错误文案；
 - 已实际调用真实视频地址接口，确认同时返回 `origin_file_url`、`video_url` 和一次性 `Set-Cookie`；
 - 已实际发起真实视频下载，确认加入接口 Set-Cookie 后 CDN 返回正常并开始写入；面板显示实时速度，取消后确认 `.japp-part` 已删除；
+- 已实际播放真实 115 视频，浏览器媒体状态达到可播放（`readyState=4`），时长和播放进度正常；
+- 播放器打开和关闭有界面测试覆盖，关闭时调用停止播放会话接口；
 - 下载按钮、保存目录结果、进度面板、取消操作和打开目录有界面测试覆盖；
 - 已定位 CDN 403 的原因：下载请求缺少视频接口返回的一次性 Set-Cookie；同时改用 115 站点分区 session；
 - 上传大文件采用流式读取，但进度回调节流和断点续传尚未实现；
 - 离线任务暂不支持暂停、继续或删除任务，仅支持提交和查看本次任务；
-- 视频下载支持取消，但不支持暂停或继续；播放功能尚未实现；
-- 56 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。
+- 视频下载支持取消，但不支持暂停或继续；播放暂不支持字幕、手动清晰度和播放进度记忆；
+- 57 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。
 
 视频播放尚未实现，计划在后续版本中使用接口返回的 `video_url` 接入播放器。

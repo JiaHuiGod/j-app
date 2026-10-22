@@ -222,3 +222,16 @@ export interface DriveVideoDownloadProgress {
   readonly error?: string;
   readonly filePath?: string;
 }
+
+export interface DrivePlaybackInput {
+  readonly connectionId: string;
+  readonly pickcode: string;
+  readonly fileName: string;
+}
+
+export interface DrivePlaybackResult {
+  readonly sessionId: string;
+  readonly playbackUrl: string;
+  readonly width: number | null;
+  readonly height: number | null;
+}

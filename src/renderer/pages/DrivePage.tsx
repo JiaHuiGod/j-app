@@ -13,6 +13,7 @@ import type {
   DriveEntry,
   DriveError,
   DriveResult,
+  DrivePlaybackResult,
   DriveUploadProgress,
   DriveUploadResult,
   DriveVideoDownloadProgress,
@@ -22,6 +23,7 @@ import { DriveActionDialog } from '../components/DriveActionDialog';
 import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
 import { DriveOfflineDialog } from '../components/DriveOfflineDialog';
+import { DrivePlayerDialog } from '../components/DrivePlayerDialog';
 import { DriveUploadPanel } from '../components/DriveUploadPanel';
 import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
@@ -50,6 +52,11 @@ interface UploadBatchState {
   readonly items: Readonly<Record<string, DriveUploadProgress>>;
   readonly result: DriveUploadResult | null;
   readonly error: string | null;
+}
+
+interface ActivePlayback {
+  readonly entry: DriveEntry;
+  readonly playback: DrivePlaybackResult;
 }
 
 const PAGE_SIZE = 100;
@@ -484,6 +491,14 @@ function DownloadIcon() {
   );
 }
 
+function PlayIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20">
+      <path d="M7 4.8 15.2 10 7 15.2V4.8Z" />
+    </svg>
+  );
+}
+
 function createDownloadId(): string {
   try {
     return crypto.randomUUID();
@@ -826,6 +841,11 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [activePlayback, setActivePlayback] = useState<ActivePlayback | null>(
+    null,
+  );
+  const [isStartingPlayback, setIsStartingPlayback] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [defaultDownloadDirectory, setDefaultDownloadDirectory] = useState<
     string | null
   >(null);
@@ -1493,6 +1513,79 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     }
   };
 
+  const stopPlaybackSession = async (sessionId: string) => {
+    try {
+      await window.desktop.drive.stopPlayback(sessionId);
+    } catch {
+      // The player is already closed; nothing else to clean up in the UI.
+    }
+  };
+
+  const handlePlayVideo = async (entry: DriveEntry) => {
+    if (!account || !entry.pickcode || isStartingPlayback) {
+      return;
+    }
+
+    setIsStartingPlayback(true);
+    setPlaybackError(null);
+
+    const previous = activePlayback;
+
+    if (previous) {
+      setActivePlayback(null);
+      await stopPlaybackSession(previous.playback.sessionId);
+    }
+
+    try {
+      const result = await window.desktop.drive.startPlayback({
+        connectionId: account.connectionId,
+        pickcode: entry.pickcode,
+        fileName: entry.name,
+      });
+
+      if (!result.ok) {
+        setPlaybackError(result.error.message);
+        return;
+      }
+
+      setActivePlayback({
+        entry,
+        playback: result.data,
+      });
+    } catch (playFailure: unknown) {
+      setPlaybackError(
+        toErrorMessage(playFailure, '无法开始播放视频，请稍后重试。'),
+      );
+    } finally {
+      setIsStartingPlayback(false);
+    }
+  };
+
+  const handleClosePlayback = () => {
+    const playback = activePlayback;
+
+    setActivePlayback(null);
+
+    if (playback) {
+      void stopPlaybackSession(playback.playback.sessionId);
+    }
+  };
+
+  const handleRetryPlayback = () => {
+    if (!activePlayback) {
+      return;
+    }
+
+    const entry = activePlayback.entry;
+    const sessionId = activePlayback.playback.sessionId;
+
+    setActivePlayback(null);
+    setIsStartingPlayback(false);
+    void stopPlaybackSession(sessionId).then(() => {
+      void handlePlayVideo(entry);
+    });
+  };
+
   useEffect(() => {
     showUploadErrorRef.current = showUploadError;
     dropUploadRef.current = (files) => {
@@ -1760,6 +1853,11 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const handleEntryDoubleClick = (entry: DriveEntry) => {
     if (entry.kind === 'folder') {
       navigateToFolder(entry.id);
+      return;
+    }
+
+    if (getFileKind(entry.extension) === 'video') {
+      void handlePlayVideo(entry);
     }
   };
 
@@ -2001,6 +2099,29 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
 
             {selectedEntries.length > 0 && (
               <div className={styles.toolbarActions}>
+                {selectedVideo && (
+                  <button
+                    className={styles.toolButton}
+                    disabled={
+                      !canMutate ||
+                      isUploading ||
+                      isStartingPlayback ||
+                      !selectedVideo.pickcode
+                    }
+                    title={
+                      selectedVideo.pickcode
+                        ? '在线播放视频'
+                        : '该视频缺少播放标识'
+                    }
+                    type="button"
+                    onClick={() => {
+                      void handlePlayVideo(selectedVideo);
+                    }}
+                  >
+                    <PlayIcon />
+                    {isStartingPlayback ? '准备播放…' : '播放'}
+                  </button>
+                )}
                 {selectedVideo && (
                   <button
                     className={styles.toolButton}
@@ -2251,6 +2372,30 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
             offlineSubmittedRef.current = true;
           }}
         />
+      )}
+
+      {activePlayback && (
+        <DrivePlayerDialog
+          fileName={activePlayback.entry.name}
+          playback={activePlayback.playback}
+          onClose={handleClosePlayback}
+          onRetry={handleRetryPlayback}
+        />
+      )}
+
+      {playbackError && (
+        <div className={styles.playbackError} role="alert">
+          <span>{playbackError}</span>
+          <button
+            aria-label="关闭播放错误提示"
+            type="button"
+            onClick={() => {
+              setPlaybackError(null);
+            }}
+          >
+            ×
+          </button>
+        </div>
       )}
 
       {uploadBatch && (

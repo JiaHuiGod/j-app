@@ -24,6 +24,8 @@ import type {
   DriveVideoDownloadInput,
   DriveVideoDownloadProgress,
   DriveVideoDownloadResult,
+  DrivePlaybackInput,
+  DrivePlaybackResult,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
@@ -67,6 +69,8 @@ export const IpcChannel = {
   DownloadDriveVideo: 'drive:video-download',
   CancelDriveDownload: 'drive:video-cancel',
   OpenDriveDownloadFolder: 'drive:video-open-folder',
+  StartDrivePlayback: 'drive:playback-start',
+  StopDrivePlayback: 'drive:playback-stop',
   DriveUploadProgress: 'drive:upload-progress',
   DriveVideoDownloadProgress: 'drive:video-download-progress',
 } as const;
@@ -145,6 +149,10 @@ export interface DriveApi {
   ) => Promise<DriveResult<DriveVideoDownloadResult>>;
   cancelDownload: (downloadId: string) => Promise<DriveResult<null>>;
   openDownloadFolder: (downloadId: string) => Promise<DriveResult<null>>;
+  startPlayback: (
+    input: DrivePlaybackInput,
+  ) => Promise<DriveResult<DrivePlaybackResult>>;
+  stopPlayback: (sessionId: string) => Promise<DriveResult<null>>;
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,
   ) => () => void;

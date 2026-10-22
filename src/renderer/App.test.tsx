@@ -180,6 +180,8 @@ let cancelDriveDownload: ReturnType<typeof vi.fn<DriveApi['cancelDownload']>>;
 let openDriveDownloadFolder: ReturnType<
   typeof vi.fn<DriveApi['openDownloadFolder']>
 >;
+let startDrivePlayback: ReturnType<typeof vi.fn<DriveApi['startPlayback']>>;
+let stopDrivePlayback: ReturnType<typeof vi.fn<DriveApi['stopPlayback']>>;
 let onDriveVideoDownloadProgress: ReturnType<
   typeof vi.fn<DriveApi['onVideoDownloadProgress']>
 >;
@@ -308,6 +310,18 @@ beforeEach(() => {
   openDriveDownloadFolder = vi
     .fn<DriveApi['openDownloadFolder']>()
     .mockResolvedValue({ ok: true, data: null });
+  startDrivePlayback = vi.fn<DriveApi['startPlayback']>().mockResolvedValue({
+    ok: true,
+    data: {
+      sessionId: 'playback-session',
+      playbackUrl: 'http://127.0.0.1:9999/p/playback-session/master.m3u8',
+      width: 1920,
+      height: 1080,
+    },
+  });
+  stopDrivePlayback = vi
+    .fn<DriveApi['stopPlayback']>()
+    .mockResolvedValue({ ok: true, data: null });
   onDriveUploadProgress = vi
     .fn<DriveApi['onUploadProgress']>()
     .mockReturnValue(() => {});
@@ -356,6 +370,8 @@ beforeEach(() => {
     downloadVideo: downloadDriveVideo,
     cancelDownload: cancelDriveDownload,
     openDownloadFolder: openDriveDownloadFolder,
+    startPlayback: startDrivePlayback,
+    stopPlayback: stopDrivePlayback,
     onUploadProgress: onDriveUploadProgress,
     onVideoDownloadProgress: onDriveVideoDownloadProgress,
   };
@@ -1146,6 +1162,66 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(cancelDriveDownload).toHaveBeenCalledWith(downloadId);
+    });
+  });
+
+  it('opens and closes the video player', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: driveAccount.connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '77',
+            parentId: '0',
+            name: 'movie.mp4',
+            kind: 'file',
+            size: 2048,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 120,
+            pickcode: 'video-pickcode',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('movie.mp4'));
+    fireEvent.click(screen.getByRole('button', { name: '播放' }));
+
+    await waitFor(() => {
+      expect(startDrivePlayback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: driveAccount.connectionId,
+          pickcode: 'video-pickcode',
+          fileName: 'movie.mp4',
+        }),
+      );
+    });
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /播放 movie\.mp4/,
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭播放器' }));
+
+    await waitFor(() => {
+      expect(stopDrivePlayback).toHaveBeenCalledWith('playback-session');
     });
   });
 

@@ -9,6 +9,7 @@ function buildContentSecurityPolicy(): string {
 
   const connectSources = [
     "'self'",
+    'http://127.0.0.1:*',
     ...(developmentOrigin ? [developmentOrigin] : []),
     ...(developmentSocketOrigin ? [developmentSocketOrigin] : []),
   ];
@@ -20,6 +21,8 @@ function buildContentSecurityPolicy(): string {
     "img-src 'self' data:",
     "font-src 'self' data:",
     `connect-src ${connectSources.join(' ')}`,
+    "media-src 'self' blob: http://127.0.0.1:*",
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",

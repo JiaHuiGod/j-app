@@ -23,6 +23,7 @@ import {
   cancel115Download,
   open115DownloadFolder,
 } from './download';
+import { start115Playback, stop115Playback } from './playback';
 import { add115OfflineTasks, list115OfflineTasks } from './offline';
 import { upload115Files } from './upload';
 import { list115Folder, search115Folder } from './115';
@@ -399,6 +400,28 @@ export function registerDriveIpcHandlers(): void {
         return open115DownloadFolder(input);
       } catch (error) {
         return unexpectedFailure('open 115 download folder', error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.StartDrivePlayback,
+    async (_event, input: unknown) => {
+      try {
+        return await start115Playback(input);
+      } catch (error) {
+        return unexpectedFailure('start 115 playback', error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.StopDrivePlayback,
+    async (_event, input: unknown) => {
+      try {
+        return stop115Playback(input);
+      } catch (error) {
+        return unexpectedFailure('stop 115 playback', error);
       }
     },
   );
