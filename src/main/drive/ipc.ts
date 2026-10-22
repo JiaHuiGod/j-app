@@ -19,7 +19,7 @@ import {
 import { getAccountSession } from './115';
 import { listDriveAccounts } from './accounts';
 import {
-  download115Video,
+  download115File,
   cancel115Download,
   open115DownloadFolder,
 } from './download';
@@ -373,12 +373,12 @@ export function registerDriveIpcHandlers(): void {
   );
 
   ipcMain.handle(
-    IpcChannel.DownloadDriveVideo,
+    IpcChannel.DownloadDriveFile,
     async (event, input: unknown) => {
       try {
-        return await download115Video(event.sender, input);
+        return await download115File(event.sender, input);
       } catch (error) {
-        return unexpectedFailure('download 115 video', error);
+        return unexpectedFailure('download 115 file', error);
       }
     },
   );

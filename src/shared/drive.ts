@@ -42,6 +42,8 @@ export interface DriveEntry {
   readonly extension: string | null;
   readonly durationSeconds: number | null;
   readonly pickcode: string | null;
+  /** 115 `d` field used by the generic file download endpoint. */
+  readonly downloadKey?: string | null;
 }
 
 export interface DriveListInput {
@@ -191,33 +193,36 @@ export interface DriveOfflineAddResult {
   readonly errors: readonly DriveOfflineAddError[];
 }
 
-export interface DriveVideoDownloadInput {
+export interface DriveDownloadInput {
   readonly downloadId: string;
   readonly connectionId: string;
   readonly pickcode: string;
   readonly fileName: string;
+  readonly kind: 'file' | 'video';
+  /** Required for non-video files; 115 `d` field. */
+  readonly downloadKey?: string;
 }
 
-export interface DriveVideoDownloadResult {
+export interface DriveDownloadResult {
   readonly canceled: boolean;
   readonly fileName: string;
   readonly filePath: string | null;
   readonly bytes: number;
 }
 
-export type DriveVideoDownloadStatus =
+export type DriveDownloadStatus =
   | 'canceled'
   | 'downloading'
   | 'failed'
   | 'preparing'
   | 'success';
 
-export interface DriveVideoDownloadProgress {
+export interface DriveDownloadProgress {
   readonly downloadId: string;
   readonly fileName: string;
   readonly receivedBytes: number;
   readonly totalBytes: number;
-  readonly status: DriveVideoDownloadStatus;
+  readonly status: DriveDownloadStatus;
   readonly bytesPerSecond?: number;
   readonly error?: string;
   readonly filePath?: string;

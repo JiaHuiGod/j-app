@@ -13,9 +13,9 @@ import type {
   DriveEntry,
   DriveError,
   DriveResult,
+  DriveDownloadProgress,
   DriveUploadProgress,
   DriveUploadResult,
-  DriveVideoDownloadProgress,
 } from '@shared/drive';
 import { toErrorMessage } from '../lib/errors';
 import { getFileKind, type FileKind } from '../lib/file-kind';
@@ -753,7 +753,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [isOfflineOpen, setIsOfflineOpen] = useState(false);
   const [uploadBatch, setUploadBatch] = useState<UploadBatchState | null>(null);
   const [downloadProgress, setDownloadProgress] =
-    useState<DriveVideoDownloadProgress | null>(null);
+    useState<DriveDownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -802,6 +802,10 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     getFileKind(selectedEntry.extension) === 'video'
       ? selectedEntry
       : null;
+  const selectedFile = selectedEntry?.kind === 'file' ? selectedEntry : null;
+  const selectedFileCanDownload =
+    Boolean(selectedFile?.pickcode) &&
+    (Boolean(selectedVideo) || Boolean(selectedFile?.downloadKey));
   const selectedVideoProgress =
     account && selectedVideo
       ? getPlaybackProgress(account.connectionId, selectedVideo.id)
@@ -1078,7 +1082,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   }, []);
 
   useEffect(() => {
-    return window.desktop.drive.onVideoDownloadProgress((progress) => {
+    return window.desktop.drive.onDownloadProgress((progress) => {
       if (progress.downloadId !== activeDownloadIdRef.current) {
         return;
       }
@@ -1093,7 +1097,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       setDownloadProgress(progress);
 
       if (progress.status === 'failed') {
-        setDownloadError(progress.error ?? '视频下载失败，请稍后重试。');
+        setDownloadError(progress.error ?? '下载失败，请稍后重试。');
         setIsCancelling(false);
       } else if (progress.status === 'success') {
         setDownloadError(null);
@@ -1308,8 +1312,17 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     );
   };
 
-  const handleDownloadVideo = async (entry: DriveEntry) => {
+  const handleDownloadFile = async (entry: DriveEntry) => {
     if (!account || isDownloading || !entry.pickcode) {
+      return;
+    }
+
+    const kind = getFileKind(entry.extension) === 'video' ? 'video' : 'file';
+    const downloadKey =
+      kind === 'file' ? (entry.downloadKey ?? undefined) : undefined;
+
+    if (kind === 'file' && !downloadKey) {
+      setDownloadError('该文件缺少下载参数。');
       return;
     }
 
@@ -1329,11 +1342,13 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     });
 
     try {
-      const result = await window.desktop.drive.downloadVideo({
+      const result = await window.desktop.drive.downloadFile({
         downloadId,
         connectionId: account.connectionId,
         pickcode: entry.pickcode,
         fileName: entry.name,
+        kind,
+        downloadKey,
       });
 
       if (!result.ok) {
@@ -1386,7 +1401,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     } catch (downloadFailure: unknown) {
       const message = toErrorMessage(
         downloadFailure,
-        '视频下载失败，请稍后重试。',
+        '文件下载失败，请稍后重试。',
       );
 
       setDownloadProgress((current) =>
@@ -1943,7 +1958,9 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                       ? selectedVideoProgress
                         ? `已选：${selectedEntry.name} · 继续观看 ${formatPlaybackPosition(selectedVideoProgress.position)}`
                         : `已选：${selectedEntry.name} · 下载到 ${defaultDownloadDirectory ?? '系统默认位置'}`
-                      : `已选：${selectedEntry.name}`
+                      : selectedFile
+                        ? `已选：${selectedEntry.name} · 下载到 ${defaultDownloadDirectory ?? '系统默认位置'}`
+                        : `已选：${selectedEntry.name}`
                     : '双击文件夹进入下一层'}
             </span>
 
@@ -1972,23 +1989,27 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                     {playback.isStarting ? '准备播放…' : '播放'}
                   </button>
                 )}
-                {selectedVideo && (
+                {selectedFile && (
                   <button
                     className={styles.toolButton}
                     disabled={
                       !canMutate ||
                       isUploading ||
                       isDownloading ||
-                      !selectedVideo.pickcode
+                      !selectedFileCanDownload
                     }
                     title={
-                      selectedVideo.pickcode
-                        ? `下载视频到 ${defaultDownloadDirectory ?? '系统默认位置'}`
-                        : '该视频缺少下载标识'
+                      !selectedFile.pickcode
+                        ? '该文件缺少下载标识'
+                        : !selectedFileCanDownload
+                          ? '该文件缺少下载参数'
+                          : `下载${selectedVideo ? '视频' : '文件'}到 ${
+                              defaultDownloadDirectory ?? '系统默认位置'
+                            }`
                     }
                     type="button"
                     onClick={() => {
-                      void handleDownloadVideo(selectedVideo);
+                      void handleDownloadFile(selectedFile);
                     }}
                   >
                     <DownloadIcon />

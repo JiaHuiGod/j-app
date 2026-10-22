@@ -13,7 +13,7 @@ import type { SiteConnectionSummary } from '@shared/connections';
 import type {
   DriveAccount,
   DriveListing,
-  DriveVideoDownloadProgress,
+  DriveDownloadProgress,
 } from '@shared/drive';
 import type {
   AppearanceApi,
@@ -184,7 +184,7 @@ let uploadDroppedDriveFiles: ReturnType<
 >;
 let listOfflineTasks: ReturnType<typeof vi.fn<DriveApi['listOfflineTasks']>>;
 let addOfflineTasks: ReturnType<typeof vi.fn<DriveApi['addOfflineTasks']>>;
-let downloadDriveVideo: ReturnType<typeof vi.fn<DriveApi['downloadVideo']>>;
+let downloadDriveFile: ReturnType<typeof vi.fn<DriveApi['downloadFile']>>;
 let cancelDriveDownload: ReturnType<typeof vi.fn<DriveApi['cancelDownload']>>;
 let openDriveDownloadFolder: ReturnType<
   typeof vi.fn<DriveApi['openDownloadFolder']>
@@ -192,8 +192,8 @@ let openDriveDownloadFolder: ReturnType<
 let startDrivePlayback: ReturnType<typeof vi.fn<DriveApi['startPlayback']>>;
 let stopDrivePlayback: ReturnType<typeof vi.fn<DriveApi['stopPlayback']>>;
 let getDriveSubtitles: ReturnType<typeof vi.fn<DriveApi['getSubtitles']>>;
-let onDriveVideoDownloadProgress: ReturnType<
-  typeof vi.fn<DriveApi['onVideoDownloadProgress']>
+let onDriveDownloadProgress: ReturnType<
+  typeof vi.fn<DriveApi['onDownloadProgress']>
 >;
 let onDriveUploadProgress: ReturnType<
   typeof vi.fn<DriveApi['onUploadProgress']>
@@ -312,7 +312,7 @@ beforeEach(() => {
       errors: [],
     },
   });
-  downloadDriveVideo = vi.fn<DriveApi['downloadVideo']>().mockResolvedValue({
+  downloadDriveFile = vi.fn<DriveApi['downloadFile']>().mockResolvedValue({
     ok: true,
     data: {
       canceled: true,
@@ -324,8 +324,8 @@ beforeEach(() => {
   cancelDriveDownload = vi
     .fn<DriveApi['cancelDownload']>()
     .mockResolvedValue({ ok: true, data: null });
-  onDriveVideoDownloadProgress = vi
-    .fn<DriveApi['onVideoDownloadProgress']>()
+  onDriveDownloadProgress = vi
+    .fn<DriveApi['onDownloadProgress']>()
     .mockReturnValue(() => {});
   openDriveDownloadFolder = vi
     .fn<DriveApi['openDownloadFolder']>()
@@ -393,14 +393,14 @@ beforeEach(() => {
     uploadDroppedFiles: uploadDroppedDriveFiles,
     listOfflineTasks,
     addOfflineTasks,
-    downloadVideo: downloadDriveVideo,
+    downloadFile: downloadDriveFile,
     cancelDownload: cancelDriveDownload,
     openDownloadFolder: openDriveDownloadFolder,
     startPlayback: startDrivePlayback,
     stopPlayback: stopDrivePlayback,
     getSubtitles: getDriveSubtitles,
     onUploadProgress: onDriveUploadProgress,
-    onVideoDownloadProgress: onDriveVideoDownloadProgress,
+    onDownloadProgress: onDriveDownloadProgress,
   };
   const appearance: AppearanceApi = {
     get: getAppearance,
@@ -1111,7 +1111,7 @@ describe('App', () => {
         hasMore: false,
       },
     });
-    downloadDriveVideo.mockResolvedValue({
+    downloadDriveFile.mockResolvedValue({
       ok: true,
       data: {
         canceled: false,
@@ -1131,11 +1131,12 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: '下载' }));
 
     await waitFor(() => {
-      expect(downloadDriveVideo).toHaveBeenCalledWith(
+      expect(downloadDriveFile).toHaveBeenCalledWith(
         expect.objectContaining({
           connectionId: driveAccount.connectionId,
           pickcode: 'video-pickcode',
           fileName: 'movie.mp4',
+          kind: 'video',
         }),
       );
     });
@@ -1147,6 +1148,71 @@ describe('App', () => {
     await waitFor(() => {
       expect(openDriveDownloadFolder).toHaveBeenCalledWith(expect.any(String));
     });
+  });
+
+  it('downloads a non-video file with its download key', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: driveAccount.connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '88',
+            parentId: '0',
+            name: 'notes.txt',
+            kind: 'file',
+            size: 1024,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'txt',
+            durationSeconds: null,
+            pickcode: 'file-pickcode',
+            downloadKey: 'file-download-key',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+    downloadDriveFile.mockResolvedValue({
+      ok: true,
+      data: {
+        canceled: false,
+        fileName: 'notes.txt',
+        filePath: 'C:\\Downloads\\notes.txt',
+        bytes: 1024,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('notes.txt'));
+    fireEvent.click(screen.getByRole('button', { name: '下载' }));
+
+    await waitFor(() => {
+      expect(downloadDriveFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: driveAccount.connectionId,
+          pickcode: 'file-pickcode',
+          fileName: 'notes.txt',
+          kind: 'file',
+          downloadKey: 'file-download-key',
+        }),
+      );
+    });
+
+    expect(await screen.findByText('下载完成')).toBeDefined();
   });
 
   it('cancels an active video download', async () => {
@@ -1179,12 +1245,11 @@ describe('App', () => {
         hasMore: false,
       },
     });
-    downloadDriveVideo.mockReturnValue(new Promise(() => {}));
+    downloadDriveFile.mockReturnValue(new Promise(() => {}));
 
-    let emitProgress: ((progress: DriveVideoDownloadProgress) => void) | null =
-      null;
+    let emitProgress: ((progress: DriveDownloadProgress) => void) | null = null;
 
-    onDriveVideoDownloadProgress.mockImplementation((listener) => {
+    onDriveDownloadProgress.mockImplementation((listener) => {
       emitProgress = listener;
       return () => {};
     });
@@ -1199,10 +1264,10 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: '下载' }));
 
     await waitFor(() => {
-      expect(downloadDriveVideo).toHaveBeenCalledOnce();
+      expect(downloadDriveFile).toHaveBeenCalledOnce();
     });
 
-    const downloadId = downloadDriveVideo.mock.calls[0]?.[0].downloadId;
+    const downloadId = downloadDriveFile.mock.calls[0]?.[0].downloadId;
 
     if (!downloadId || !emitProgress) {
       throw new Error('download did not start');

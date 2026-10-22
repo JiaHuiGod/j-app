@@ -1,10 +1,10 @@
-import type { DriveVideoDownloadProgress } from '@shared/drive';
+import type { DriveDownloadProgress } from '@shared/drive';
 import styles from './DriveDownloadPanel.module.css';
 
 interface DriveDownloadPanelProps {
   readonly error: string | null;
   readonly isCancelling: boolean;
-  readonly progress: DriveVideoDownloadProgress;
+  readonly progress: DriveDownloadProgress;
   readonly onCancel: () => void;
   readonly onClose: () => void;
   readonly onOpenFolder: () => void;
@@ -27,7 +27,7 @@ function formatBytes(value: number): string {
   return `${size >= 10 ? Math.round(size) : size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-function isActive(progress: DriveVideoDownloadProgress): boolean {
+function isActive(progress: DriveDownloadProgress): boolean {
   return progress.status === 'preparing' || progress.status === 'downloading';
 }
 
@@ -149,7 +149,7 @@ export function DriveDownloadPanel({
 
       {progress.status === 'failed' && (
         <p className={styles.error} role="alert">
-          {error || progress.error || '视频下载失败，请稍后重试。'}
+          {error || progress.error || '下载失败，请稍后重试。'}
         </p>
       )}
 

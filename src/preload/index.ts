@@ -18,8 +18,8 @@ import type {
   DriveSearchInput,
   DriveUploadInput,
   DriveUploadProgress,
-  DriveVideoDownloadInput,
-  DriveVideoDownloadProgress,
+  DriveDownloadInput,
+  DriveDownloadProgress,
 } from '@shared/drive';
 import {
   IpcChannel,
@@ -154,8 +154,8 @@ const drive = Object.freeze<DriveApi>({
   addOfflineTasks: (input: DriveOfflineAddInput) => {
     return ipcRenderer.invoke(IpcChannel.AddDriveOfflineTasks, input);
   },
-  downloadVideo: (input: DriveVideoDownloadInput) => {
-    return ipcRenderer.invoke(IpcChannel.DownloadDriveVideo, input);
+  downloadFile: (input: DriveDownloadInput) => {
+    return ipcRenderer.invoke(IpcChannel.DownloadDriveFile, input);
   },
   cancelDownload: (downloadId: string) => {
     return ipcRenderer.invoke(IpcChannel.CancelDriveDownload, downloadId);
@@ -186,23 +186,18 @@ const drive = Object.freeze<DriveApi>({
       ipcRenderer.removeListener(IpcChannel.DriveUploadProgress, handler);
     };
   },
-  onVideoDownloadProgress: (
-    listener: (progress: DriveVideoDownloadProgress) => void,
-  ) => {
+  onDownloadProgress: (listener: (progress: DriveDownloadProgress) => void) => {
     const handler = (
       _event: IpcRendererEvent,
-      progress: DriveVideoDownloadProgress,
+      progress: DriveDownloadProgress,
     ) => {
       listener(progress);
     };
 
-    ipcRenderer.on(IpcChannel.DriveVideoDownloadProgress, handler);
+    ipcRenderer.on(IpcChannel.DriveDownloadProgress, handler);
 
     return () => {
-      ipcRenderer.removeListener(
-        IpcChannel.DriveVideoDownloadProgress,
-        handler,
-      );
+      ipcRenderer.removeListener(IpcChannel.DriveDownloadProgress, handler);
     };
   },
 });

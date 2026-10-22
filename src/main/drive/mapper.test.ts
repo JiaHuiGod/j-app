@@ -59,6 +59,7 @@ describe('115 file normalization', () => {
         te: '1729500000',
         ico: 'TXT',
         pc: 'pickcode-txt',
+        d: 'download-key-txt',
       }),
     ).toEqual({
       id: '20',
@@ -70,6 +71,7 @@ describe('115 file normalization', () => {
       extension: 'txt',
       durationSeconds: null,
       pickcode: 'pickcode-txt',
+      downloadKey: 'download-key-txt',
     });
   });
 

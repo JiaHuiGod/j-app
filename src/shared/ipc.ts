@@ -21,9 +21,9 @@ import type {
   DriveUploadInput,
   DriveUploadProgress,
   DriveUploadResult,
-  DriveVideoDownloadInput,
-  DriveVideoDownloadProgress,
-  DriveVideoDownloadResult,
+  DriveDownloadInput,
+  DriveDownloadProgress,
+  DriveDownloadResult,
   DrivePlaybackInput,
   DrivePlaybackResult,
   DriveSubtitle,
@@ -70,14 +70,14 @@ export const IpcChannel = {
   UploadDroppedDriveFiles: 'drive:upload-dropped-files',
   ListDriveOfflineTasks: 'drive:offline-list',
   AddDriveOfflineTasks: 'drive:offline-add',
-  DownloadDriveVideo: 'drive:video-download',
-  CancelDriveDownload: 'drive:video-cancel',
-  OpenDriveDownloadFolder: 'drive:video-open-folder',
+  DownloadDriveFile: 'drive:file-download',
+  CancelDriveDownload: 'drive:file-cancel',
+  OpenDriveDownloadFolder: 'drive:file-open-folder',
   StartDrivePlayback: 'drive:playback-start',
   StopDrivePlayback: 'drive:playback-stop',
   GetDriveSubtitles: 'drive:subtitles',
   DriveUploadProgress: 'drive:upload-progress',
-  DriveVideoDownloadProgress: 'drive:video-download-progress',
+  DriveDownloadProgress: 'drive:file-download-progress',
 } as const;
 
 export interface AppInfo {
@@ -152,9 +152,9 @@ export interface DriveApi {
   addOfflineTasks: (
     input: DriveOfflineAddInput,
   ) => Promise<DriveResult<DriveOfflineAddResult>>;
-  downloadVideo: (
-    input: DriveVideoDownloadInput,
-  ) => Promise<DriveResult<DriveVideoDownloadResult>>;
+  downloadFile: (
+    input: DriveDownloadInput,
+  ) => Promise<DriveResult<DriveDownloadResult>>;
   cancelDownload: (downloadId: string) => Promise<DriveResult<null>>;
   openDownloadFolder: (downloadId: string) => Promise<DriveResult<null>>;
   startPlayback: (
@@ -167,8 +167,8 @@ export interface DriveApi {
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,
   ) => () => void;
-  onVideoDownloadProgress: (
-    listener: (progress: DriveVideoDownloadProgress) => void,
+  onDownloadProgress: (
+    listener: (progress: DriveDownloadProgress) => void,
   ) => () => void;
 }
 

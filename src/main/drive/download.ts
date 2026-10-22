@@ -2,11 +2,11 @@ import path from 'node:path';
 import { createWriteStream, promises as fs } from 'node:fs';
 import { dialog, net, shell, type Session, type WebContents } from 'electron';
 import type {
+  DriveDownloadProgress,
+  DriveDownloadResult,
   DriveError,
   DriveErrorCode,
   DriveResult,
-  DriveVideoDownloadProgress,
-  DriveVideoDownloadResult,
 } from '@shared/drive';
 import { IpcChannel } from '@shared/ipc';
 import { parseSiteConnectionId } from '../settings/schema';
@@ -16,7 +16,10 @@ import { fetch115JsonDetailed } from './115-http';
 import { getDownloadDirectory } from '../settings/store';
 
 const VIDEO_ENDPOINT = 'https://webapi.115.com/files/video?pickcode=';
+const FILE_DOWNLOAD_ENDPOINT = 'https://webapi.115.com/files/download?';
+const FILE_REDIRECT_ENDPOINT = 'https://dl.115cdn.net/files/dl302?';
 const MAX_PICKCODE_LENGTH = 128;
+const MAX_DOWNLOAD_KEY_LENGTH = 256;
 const MAX_DOWNLOAD_ID_LENGTH = 128;
 const MAX_FILE_NAME_LENGTH = 200;
 const PROGRESS_INTERVAL_MS = 250;
@@ -47,7 +50,7 @@ const activeDownloads = new Map<string, AbortController>();
 
 class DownloadCanceledError extends Error {
   constructor() {
-    super('视频下载已取消。');
+    super('下载已取消。');
     this.name = 'DownloadCanceledError';
   }
 }
@@ -57,12 +60,12 @@ interface ParsedDownloadRequest {
   readonly connectionId: string;
   readonly pickcode: string;
   readonly fileName: string;
+  readonly kind: 'file' | 'video';
+  readonly downloadKey: string;
 }
 
-interface VideoSource {
+interface DownloadSource {
   readonly downloadUrl: string;
-  /** m3u8 URL returned by 115; reserved for the future in-app player. */
-  readonly playUrl: string;
   readonly setCookie: readonly string[];
 }
 
@@ -94,7 +97,7 @@ function asText(value: unknown): string {
 function errorMessage(error: unknown): string {
   return error instanceof Error && error.message
     ? error.message
-    : '视频下载失败，请稍后重试。';
+    : '文件下载失败，请稍后重试。';
 }
 
 function parseHttpUrl(value: unknown): string | null {
@@ -125,7 +128,7 @@ function sanitizeFileName(value: unknown): string {
     .replace(/[. ]+$/g, '')
     .slice(0, MAX_FILE_NAME_LENGTH);
 
-  return baseName || 'video.mp4';
+  return baseName || 'download';
 }
 
 function parseDownloadRequest(
@@ -134,7 +137,7 @@ function parseDownloadRequest(
   if (typeof value !== 'object' || value === null) {
     return {
       code: 'invalid_input',
-      message: '视频下载参数不正确。',
+      message: '下载参数不正确。',
     };
   }
 
@@ -152,17 +155,25 @@ function parseDownloadRequest(
 
   const downloadId = asText(input.downloadId);
   const pickcode = asText(input.pickcode);
+  const kind =
+    input.kind === 'file' || input.kind === 'video' ? input.kind : null;
+  const downloadKey = asText(input.downloadKey);
 
   if (
     !downloadId ||
     downloadId.length > MAX_DOWNLOAD_ID_LENGTH ||
     !pickcode ||
     pickcode.length > MAX_PICKCODE_LENGTH ||
-    !/^[A-Za-z0-9_-]+$/.test(pickcode)
+    !/^[A-Za-z0-9_-]+$/.test(pickcode) ||
+    !kind ||
+    (kind === 'file' &&
+      (!downloadKey ||
+        downloadKey.length > MAX_DOWNLOAD_KEY_LENGTH ||
+        !/^[A-Za-z0-9_-]+$/.test(downloadKey)))
   ) {
     return {
       code: 'invalid_input',
-      message: '视频下载参数不正确。',
+      message: '下载参数不正确。',
     };
   }
 
@@ -171,22 +182,24 @@ function parseDownloadRequest(
     connectionId,
     pickcode,
     fileName: sanitizeFileName(input.fileName),
+    kind,
+    downloadKey,
   };
 }
 
 function sendProgress(
   sender: WebContents,
-  progress: DriveVideoDownloadProgress,
+  progress: DriveDownloadProgress,
 ): void {
   if (!sender.isDestroyed()) {
-    sender.send(IpcChannel.DriveVideoDownloadProgress, progress);
+    sender.send(IpcChannel.DriveDownloadProgress, progress);
   }
 }
 
 async function getVideoSource(
   siteSession: Session,
   pickcode: string,
-): Promise<DriveResult<VideoSource>> {
+): Promise<DriveResult<DownloadSource>> {
   const response = await fetch115JsonDetailed(
     siteSession,
     `${VIDEO_ENDPOINT}${encodeURIComponent(pickcode)}`,
@@ -197,7 +210,6 @@ async function getVideoSource(
   }
 
   const downloadUrl = parseHttpUrl(response.data.data.origin_file_url);
-  const playUrl = parseHttpUrl(response.data.data.video_url);
 
   if (!downloadUrl) {
     return failure('api', '115 没有返回可用的视频下载地址。');
@@ -209,8 +221,81 @@ async function getVideoSource(
     ok: true,
     data: {
       downloadUrl,
-      playUrl: playUrl ?? '',
       setCookie: response.data.setCookie,
+    },
+  };
+}
+
+async function getFileSource(
+  siteSession: Session,
+  pickcode: string,
+  downloadKey: string,
+): Promise<DriveResult<DownloadSource>> {
+  const first = await fetch115JsonDetailed(
+    siteSession,
+    `${FILE_DOWNLOAD_ENDPOINT}dl=${encodeURIComponent(downloadKey)}&pickcode=${encodeURIComponent(pickcode)}&_=${Date.now()}`,
+  );
+
+  if (!first.ok) {
+    return first;
+  }
+
+  const directUrl = parseHttpUrl(first.data.data.file_url);
+
+  if (directUrl) {
+    await discardSetCookies(siteSession, directUrl, first.data.setCookie);
+
+    return {
+      ok: true,
+      data: {
+        downloadUrl: directUrl,
+        setCookie: first.data.setCookie,
+      },
+    };
+  }
+
+  const redirectUrl = parseHttpUrl(first.data.data.file_url_302);
+
+  if (!redirectUrl) {
+    return failure('api', '115 没有返回可用的文件下载地址。');
+  }
+
+  let downloadToken: string | null = null;
+
+  try {
+    downloadToken = new URL(redirectUrl).searchParams.get('t');
+  } catch {
+    downloadToken = null;
+  }
+
+  if (!downloadToken) {
+    return failure('api', '解析文件下载参数失败。');
+  }
+
+  const second = await fetch115JsonDetailed(
+    siteSession,
+    `${FILE_REDIRECT_ENDPOINT}t=${encodeURIComponent(downloadToken)}&_=${Date.now()}`,
+  );
+
+  if (!second.ok) {
+    return second;
+  }
+
+  const downloadUrl = parseHttpUrl(second.data.data.file_url);
+
+  if (!downloadUrl) {
+    return failure('api', '115 没有返回可用的文件下载地址。');
+  }
+
+  const setCookie = [...first.data.setCookie, ...second.data.setCookie];
+
+  await discardSetCookies(siteSession, downloadUrl, setCookie);
+
+  return {
+    ok: true,
+    data: {
+      downloadUrl,
+      setCookie,
     },
   };
 }
@@ -219,7 +304,12 @@ function is115Host(url: string): boolean {
   try {
     const host = new URL(url).hostname;
 
-    return host === '115.com' || host.endsWith('.115.com');
+    return (
+      host === '115.com' ||
+      host.endsWith('.115.com') ||
+      host === '115cdn.net' ||
+      host.endsWith('.115cdn.net')
+    );
   } catch {
     return false;
   }
@@ -358,7 +448,10 @@ async function downloadToFile(
       signal.addEventListener('abort', onAbort, { once: true });
 
       request.setHeader('Accept', '*/*');
-      request.setHeader('Referer', 'https://115.com/');
+
+      if (requestInfo.kind === 'video') {
+        request.setHeader('Referer', 'https://115.com/');
+      }
 
       const userAgent = siteSession.getUserAgent();
 
@@ -371,7 +464,7 @@ async function downloadToFile(
       }
 
       request.on('error', () => {
-        fail(new Error('无法连接视频下载地址。'));
+        fail(new Error('无法连接文件下载地址。'));
       });
 
       request.on('response', (response) => {
@@ -388,7 +481,7 @@ async function downloadToFile(
           response.on('end', () => {
             fail(
               new Error(
-                `视频下载地址返回失败（HTTP ${response.statusCode}）：${body.slice(0, 200)}`,
+                `文件下载地址返回失败（HTTP ${response.statusCode}）：${body.slice(0, 200)}`,
               ),
             );
           });
@@ -489,10 +582,10 @@ async function downloadToFile(
   }
 }
 
-export async function download115Video(
+export async function download115File(
   sender: WebContents,
   value: unknown,
-): Promise<DriveResult<DriveVideoDownloadResult>> {
+): Promise<DriveResult<DriveDownloadResult>> {
   const request = parseDownloadRequest(value);
 
   if (isDriveError(request)) {
@@ -513,7 +606,10 @@ export async function download115Video(
     status: 'preparing',
   });
 
-  const source = await getVideoSource(siteSession, request.pickcode);
+  const source =
+    request.kind === 'video'
+      ? await getVideoSource(siteSession, request.pickcode)
+      : await getFileSource(siteSession, request.pickcode, request.downloadKey);
 
   if (!source.ok) {
     sendProgress(sender, {
@@ -530,15 +626,18 @@ export async function download115Video(
 
   const parent = getMainWindow();
   const defaultDirectory = await getDownloadDirectory().catch(() => null);
+  const isVideo = request.kind === 'video';
   const options = {
-    title: '保存视频',
+    title: isVideo ? '保存视频' : '保存文件',
     defaultPath: defaultDirectory
       ? path.join(defaultDirectory, request.fileName)
       : request.fileName,
-    filters: [
-      { name: '视频文件', extensions: VIDEO_EXTENSIONS },
-      { name: '所有文件', extensions: ['*'] },
-    ],
+    filters: isVideo
+      ? [
+          { name: '视频文件', extensions: VIDEO_EXTENSIONS },
+          { name: '所有文件', extensions: ['*'] },
+        ]
+      : [{ name: '所有文件', extensions: ['*'] }],
   };
   const selection = parent
     ? await dialog.showSaveDialog(parent, options)
