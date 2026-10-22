@@ -5,6 +5,7 @@ import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { DownloadSettings } from '../components/DownloadSettings';
 import { GlobeIcon } from '../components/GlobeIcon';
 import { ThemeSettings } from '../components/ThemeSettings';
+import type { AppearanceController } from '../hooks/useAppearance';
 import { toErrorMessage } from '../lib/errors';
 import page from '../styles/page.module.css';
 import ui from '../styles/ui.module.css';
@@ -60,7 +61,11 @@ function LockIcon() {
   );
 }
 
-export function SettingsPage() {
+interface SettingsPageProps {
+  readonly appearance: AppearanceController;
+}
+
+export function SettingsPage({ appearance }: SettingsPageProps) {
   const [connections, setConnections] = useState<
     readonly SiteConnectionSummary[]
   >([]);
@@ -198,7 +203,15 @@ export function SettingsPage() {
         </aside>
       </header>
 
-      <ThemeSettings />
+      <ThemeSettings
+        error={appearance.error}
+        isLoading={appearance.isLoading}
+        isSaving={appearance.isSaving}
+        preference={appearance.preference}
+        onSelectTheme={(theme) => {
+          void appearance.setPreference(theme);
+        }}
+      />
       <DownloadSettings />
 
       <section aria-labelledby="connections-title" className={styles.card}>

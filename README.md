@@ -225,7 +225,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 布局和大致的扩展位置在 [`src/renderer/components/TitleBar.tsx`](src/renderer/components/TitleBar.tsx)，对应样式在同目录的 `TitleBar.module.css`：
 
 - 导航区域：数据驱动的主导航，当前包含“概览 / 网盘 / 设置”；
-- 工具区域：全局工具按钮区域，目前包含“网络代理”入口，也可继续添加搜索、通知等操作；
+- 工具区域：全局工具按钮区域，目前包含“网络代理”和“主题切换”入口，也可继续添加搜索、通知等操作；
 - 中间留白同时作为拖拽窗口的区域。
 
 窗口控制通过 `window.desktop.windowControls` 暴露，渲染层拿不到原始 `ipcRenderer`。主进程根据 IPC 发送者定位窗口，并在最大化状态变化时广播事件，按钮图标会随之切换。开发模式启动时会自动在独立窗口打开 DevTools，也可以使用 `F12` 或 `Ctrl/Cmd + Shift + I` 手动切换；生产构建不会自动打开。
@@ -236,7 +236,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 - **概览**：现有工程自检与运行环境
 - **网盘**：115 网盘浏览、当前目录搜索、文件选择/拖拽上传、新建文件夹、重命名、Ctrl 多选、批量移动与删除、离线任务、视频下载与在线播放
-- **设置**：应用主题外观、默认下载目录、本地字幕目录与站点账号管理，网络代理仍保持从标题栏独立打开
+- **设置**：应用主题外观、默认下载目录、本地字幕目录与站点账号管理，网络代理仍保持从标题栏独立打开，主题也可从标题栏“代理”右侧快速切换
 
 导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换到网盘页时会保留上次目录、滚动位置、选中项和搜索状态。
 
@@ -259,11 +259,13 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 ## 主题与外观
 
-设置页提供三档主题：
+设置页提供三档主题，标题栏“代理”右侧也提供同一套主题快捷菜单：
 
 - **浅色**：默认值，始终使用明亮界面；
 - **深色**：始终使用暗色界面；
 - **跟随系统**：随操作系统外观自动切换。
+
+标题栏与设置页共享同一份主题状态：从任一处切换后，另一处会立即同步，主题保存在 `settings.json` 的 `appearance.theme`。
 
 主题保存在 `settings.json` 的 `appearance.theme`，主进程在创建窗口前写入 `nativeTheme.themeSource`，因此首屏直接使用正确主题，不会出现浅色闪烁。渲染层通过 `@media (prefers-color-scheme: dark)` 选择整套暗色 Token，并同步 `color-scheme`、滚动条、输入控件和原生弹窗背景。
 

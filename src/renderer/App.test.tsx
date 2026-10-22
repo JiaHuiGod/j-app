@@ -1637,6 +1637,41 @@ describe('App', () => {
     expect(screen.queryByText('GitHub')).toBeNull();
   });
 
+  it('switches the appearance theme from the title bar menu', async () => {
+    render(<App />);
+
+    const themeButton = await screen.findByRole('button', {
+      name: '主题，当前跟随系统',
+    });
+
+    await waitFor(() => {
+      expect((themeButton as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    fireEvent.click(themeButton);
+
+    expect(screen.getByRole('menu', { name: '选择主题' })).toBeDefined();
+    expect(
+      screen
+        .getByRole('menuitemradio', { name: '跟随系统' })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '深色' }));
+
+    expect(setAppearanceTheme).toHaveBeenCalledWith('dark');
+    expect(
+      await screen.findByRole('button', { name: '主题，当前深色' }),
+    ).toBeDefined();
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+    expect(
+      await screen.findByRole('radio', { name: /深色/, checked: true }),
+    ).toBeDefined();
+  });
+
   it('changes the appearance theme from the settings page', async () => {
     render(<App />);
     await screen.findByRole('button', {

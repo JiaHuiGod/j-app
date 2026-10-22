@@ -122,6 +122,16 @@
   background: rgb(23 25 31 / 10%);
 }
 
+.action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.actionOpen {
+  color: var(--ink);
+  background: rgb(23 25 31 / 6%);
+}
+
 .action:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: -2px;
@@ -130,6 +140,87 @@
 .actionIcon {
   width: 14px;
   height: 14px;
+}
+
+.actionLabel {
+  white-space: nowrap;
+}
+
+.themeControl {
+  position: relative;
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+
+.themeMenu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 30;
+  min-width: 158px;
+  padding: 5px;
+  background: rgb(255 253 248 / 97%);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 18px 46px -22px rgb(23 25 31 / 42%);
+  backdrop-filter: blur(18px);
+  -webkit-app-region: no-drag;
+}
+
+.themeOption {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.themeOption:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgb(23 25 31 / 5%);
+}
+
+.themeOption:focus-visible {
+  color: var(--ink);
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.themeOption:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.themeOptionSelected {
+  color: var(--ink);
+  background: rgb(33 72 255 / 7%);
+}
+
+.themeOptionIcon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.themeCheck {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+  color: var(--blue);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .action.enabled {
@@ -233,8 +324,22 @@
 
   .navItem.active:hover,
   .action:active,
+  .actionOpen,
   .windowControl:active {
     background: rgb(255 255 255 / 10%);
+  }
+
+  .themeMenu {
+    background: rgb(24 27 34 / 98%);
+    box-shadow: 0 18px 46px -22px rgb(0 0 0 / 72%);
+  }
+
+  .themeOption:hover:not(:disabled) {
+    background: rgb(255 255 255 / 6%);
+  }
+
+  .themeOptionSelected {
+    background: rgb(100 126 255 / 13%);
   }
 
   .close:hover {
@@ -267,6 +372,16 @@
 
   .navItem {
     padding-inline: 7px;
+  }
+
+  .action {
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+  }
+
+  .actionLabel {
+    display: none;
   }
 
   .windowControl {

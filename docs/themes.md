@@ -1,4 +1,4 @@
-﻿# 主题与外观
+# 主题与外观
 
 ## 1. 功能目标
 
@@ -20,7 +20,9 @@
 
 ```text
 Renderer
-  ThemeSettings
+  App / useAppearance
+        ├─ TitleBar 主题快捷菜单
+        └─ ThemeSettings
         │ appearance.get / setTheme
         ▼
 Preload
@@ -46,9 +48,13 @@ Renderer CSS
 | `src/main/appearance/theme.ts`                     | 启动应用主题、切换主题、窗口背景色 |
 | `src/main/settings/schema.ts`                      | v1/v2 → v3 迁移与主题校验          |
 | `src/main/settings/store.ts`                       | 持久化 `appearance.theme`          |
+| `src/renderer/hooks/useAppearance.ts`              | 共享主题状态、读取、保存与错误处理 |
+| `src/renderer/lib/theme.ts`                        | 三档主题文案与标签                 |
+| `src/renderer/components/ThemeIcon.tsx`            | 浅色/深色/系统主题图标             |
 | `src/renderer/components/ThemeSettings.tsx`        | 三档主题选择和预览                 |
 | `src/renderer/components/ThemeSettings.module.css` | 主题选择器、暗色与响应式样式       |
-| `src/renderer/components/TitleBar.module.css`      | 标题栏暗色与响应式样式             |
+| `src/renderer/components/TitleBar.tsx`             | 标题栏主题快捷菜单                 |
+| `src/renderer/components/TitleBar.module.css`      | 标题栏、主题菜单、暗色与响应式样式 |
 | `src/renderer/pages/SettingsPage.module.css`       | 设置页、站点卡片与暗色状态         |
 | `src/renderer/styles/global.css`                   | 全局样式入口                       |
 | `src/renderer/styles/tokens.css`                   | 亮/暗设计 Token                    |
@@ -144,12 +150,14 @@ Electron 的 `nativeTheme.themeSource` 会同步影响渲染进程的 `prefers-c
 
 ## 6. 交互与状态
 
-设置页“外观”卡片提供三张带缩略预览的单选卡：
+设置页“外观”卡片提供三张带缩略预览的单选卡；标题栏“代理”右侧的主题按钮提供同一组三档主题的快捷菜单：
 
-- 使用原生 `radio` 保持键盘和辅助技术语义；
+- 使用原生 `radio` 和 `menuitemradio`，保留键盘与辅助技术语义；
 - 选中项显示蓝色边框、勾选标记和淡蓝背景；
 - 切换即时生效，不需要重启；
-- 主题写入成功后更新选择状态；写入失败时保留旧状态并显示错误；
+- 主题写入成功后更新选择状态；写入失败时保留旧状态，并在标题栏和设置页显示错误；
+- 标题栏菜单支持点击外部或按 `Escape` 关闭，选择后菜单立即收起；
+- 标题栏与设置页共享 `App` 中的 `useAppearance` 状态，从任一处切换会同步到另一处；
 - 系统模式切换时，页面通过 CSS media query 自动响应，不依赖 React 监听。
 
 ## 7. 验证记录
@@ -160,10 +168,11 @@ Electron 的 `nativeTheme.themeSource` 会同步影响渲染进程的 `prefers-c
 - 暗色页面视觉审计只发现主题预览和主按钮的预期浅色背景；
 - 切换主题后重启应用，仍以深色启动，设置页选中“深色”；
 - 900×620 视口下主题选项仍为三列且无横向溢出（窗口最小尺寸为 900×620；更窄的 Web 预览会变成单列）；
+- 标题栏主题菜单可切换三档主题，并同步设置页选中状态；
 - Vitest 覆盖主题选择交互、配置迁移和主题值校验；
 - 打包应用无渲染层异常或控制台错误。
 
-当前测试总数为 69 个，`pnpm check` 全部通过。
+当前测试总数为 88 个，`pnpm check` 全部通过。
 
 ## 8. 已知限制
 

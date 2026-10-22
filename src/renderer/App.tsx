@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ThemePreference } from '@shared/appearance';
 import type { ProxySettings } from '@shared/settings';
 import { ProxyDialog } from './components/ProxyDialog';
 import { TitleBar } from './components/TitleBar';
+import { useAppearance } from './hooks/useAppearance';
 import type { AppPage } from './navigation';
 import { DrivePage } from './pages/DrivePage';
 import { OverviewPage } from './pages/OverviewPage';
@@ -13,6 +15,7 @@ function App() {
   const [isProxyDialogOpen, setIsProxyDialogOpen] = useState(false);
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const appShellRef = useRef<HTMLDivElement>(null);
+  const appearance = useAppearance();
 
   useEffect(() => {
     let isCurrent = true;
@@ -49,15 +52,24 @@ function App() {
     setProxyEnabled(proxy.enabled);
   };
 
+  const handleSelectTheme = (preference: ThemePreference) => {
+    void appearance.setPreference(preference);
+  };
+
   return (
     <div className="app-window">
       <TitleBar
         activePage={activePage}
+        isThemeLoading={appearance.isLoading}
+        isThemeSaving={appearance.isSaving}
         proxyEnabled={proxyEnabled}
+        themeError={appearance.error}
+        themePreference={appearance.preference}
         onNavigate={handleNavigate}
         onOpenProxySettings={() => {
           setIsProxyDialogOpen(true);
         }}
+        onSelectTheme={handleSelectTheme}
       />
 
       <div className="app-shell" ref={appShellRef}>
@@ -74,7 +86,7 @@ function App() {
           </div>
         )}
 
-        {activePage === 'settings' && <SettingsPage />}
+        {activePage === 'settings' && <SettingsPage appearance={appearance} />}
 
         <footer className="app-footer">
           <span>J App · 本地优先</span>

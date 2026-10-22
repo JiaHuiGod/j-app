@@ -1,31 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { type ThemePreference } from '@shared/appearance';
-import { toErrorMessage } from '../lib/errors';
+import type { ThemePreference } from '@shared/appearance';
+import { THEME_OPTIONS } from '../lib/theme';
 import styles from './ThemeSettings.module.css';
-
-interface ThemeOption {
-  readonly value: ThemePreference;
-  readonly label: string;
-  readonly description: string;
-}
-
-const THEME_OPTIONS: readonly ThemeOption[] = [
-  {
-    value: 'light',
-    label: '浅色',
-    description: '始终使用明亮界面',
-  },
-  {
-    value: 'dark',
-    label: '深色',
-    description: '始终使用暗色界面',
-  },
-  {
-    value: 'system',
-    label: '跟随系统',
-    description: '随操作系统外观切换',
-  },
-];
 
 const THEME_PREVIEW_CLASSES: Record<ThemePreference, string> = {
   light: styles.previewLight ?? '',
@@ -55,64 +30,27 @@ function ThemePreview({ mode }: { mode: ThemePreference }) {
   );
 }
 
-export function ThemeSettings() {
-  const [preference, setPreference] = useState<ThemePreference>('system');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
-  const isMountedRef = useRef(true);
+interface ThemeSettingsProps {
+  readonly preference: ThemePreference;
+  readonly isLoading: boolean;
+  readonly isSaving: boolean;
+  readonly error: string;
+  readonly onSelectTheme: (theme: ThemePreference) => void;
+}
 
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    void window.desktop.appearance
-      .get()
-      .then((state) => {
-        if (isMountedRef.current) {
-          setPreference(state.preference);
-        }
-      })
-      .catch((loadFailure: unknown) => {
-        if (isMountedRef.current) {
-          setError(
-            toErrorMessage(loadFailure, '无法读取主题设置，请稍后重试。'),
-          );
-        }
-      })
-      .finally(() => {
-        if (isMountedRef.current) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  const handleSelect = async (theme: ThemePreference) => {
+export function ThemeSettings({
+  preference,
+  isLoading,
+  isSaving,
+  error,
+  onSelectTheme,
+}: ThemeSettingsProps) {
+  const handleSelect = (theme: ThemePreference) => {
     if (isLoading || isSaving || theme === preference) {
       return;
     }
 
-    setIsSaving(true);
-    setError('');
-
-    try {
-      const state = await window.desktop.appearance.setTheme(theme);
-
-      if (isMountedRef.current) {
-        setPreference(state.preference);
-      }
-    } catch (saveFailure: unknown) {
-      if (isMountedRef.current) {
-        setError(toErrorMessage(saveFailure, '主题切换失败，请稍后重试。'));
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsSaving(false);
-      }
-    }
+    onSelectTheme(theme);
   };
 
   return (
