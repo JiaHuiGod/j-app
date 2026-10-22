@@ -1,0 +1,440 @@
+.toolbar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  padding: 34px 14px 10px;
+  color: #f3f5fb;
+  background: linear-gradient(
+    to top,
+    rgb(3 5 10 / 88%) 0%,
+    rgb(3 5 10 / 58%) 55%,
+    transparent 100%
+  );
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.toolbarVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toolbarHidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.seekRow {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 2px;
+}
+
+.seek {
+  width: 100%;
+  height: 14px;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.seek::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    #93a8ff 0%,
+    #93a8ff var(--seek-progress),
+    rgb(255 255 255 / 30%) var(--seek-progress),
+    rgb(255 255 255 / 30%) var(--seek-buffer),
+    rgb(255 255 255 / 18%) var(--seek-buffer),
+    rgb(255 255 255 / 18%) 100%
+  );
+  border-radius: 999px;
+}
+
+.seek::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  appearance: none;
+  background: #fff;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 45%);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.seek:hover::-webkit-slider-thumb,
+.seek:focus-visible::-webkit-slider-thumb,
+.seek:active::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.seek:focus-visible {
+  outline: none;
+}
+
+.seek:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgb(147 168 255 / 38%);
+}
+
+.seek:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.controlsRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 2px;
+}
+
+.control {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #e8ebf5;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.control:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.control:active {
+  background: rgb(255 255 255 / 18%);
+}
+
+.control:focus-visible {
+  outline: 2px solid #aebfff;
+  outline-offset: -2px;
+}
+
+.controlActive {
+  color: #c8d2ff;
+  background: rgb(147 168 255 / 16%);
+}
+
+.controlIcon {
+  width: 17px;
+  height: 17px;
+}
+
+.time {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  align-items: center;
+  min-width: 88px;
+  margin-left: 2px;
+  color: #f0f2f9;
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeDivider,
+.timeMuted {
+  color: rgb(255 255 255 / 52%);
+}
+
+.spacer {
+  flex: 1;
+  min-width: 4px;
+}
+
+.volumeGroup {
+  display: flex;
+  flex: none;
+  gap: 1px;
+  align-items: center;
+}
+
+.volume {
+  width: 68px;
+  height: 18px;
+  padding: 0;
+  margin: 0 2px 0 0;
+  accent-color: #93a8ff;
+  cursor: pointer;
+}
+
+.rateButton {
+  width: auto;
+  min-width: 40px;
+  padding: 0 7px;
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.menuAnchor {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 9px);
+  z-index: 20;
+  min-width: 132px;
+  padding: 5px;
+  background: rgb(15 18 27 / 97%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 10px;
+  box-shadow: 0 18px 42px -18px rgb(0 0 0 / 78%);
+  backdrop-filter: blur(16px);
+}
+
+.menuOption {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  color: rgb(239 242 251 / 78%);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.64rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.menuOption:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 9%);
+}
+
+.menuOption:focus-visible {
+  outline: 2px solid #aebfff;
+  outline-offset: -2px;
+}
+
+.menuOptionSelected {
+  color: #dfe6ff;
+  background: rgb(147 168 255 / 15%);
+}
+
+.menuCheck {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  color: #aebfff;
+}
+
+.subtitleMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: min(266px, calc(100vw - 36px));
+  padding: 12px;
+}
+
+.subtitleHeader {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.subtitleHeader strong {
+  font-size: 0.72rem;
+  letter-spacing: -0.01em;
+}
+
+.subtitleToggle {
+  height: 24px;
+  padding: 0 8px;
+  color: rgb(255 255 255 / 70%);
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 650;
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.subtitleToggle:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.subtitleToggleOn {
+  color: #dce5ff;
+  background: rgb(147 168 255 / 18%);
+  border-color: rgb(174 191 255 / 34%);
+}
+
+.subtitleToggle:focus-visible,
+.delayButton:focus-visible,
+.delayReset:focus-visible {
+  outline: 2px solid #aebfff;
+  outline-offset: 1px;
+}
+
+.subtitleStatus {
+  color: rgb(255 255 255 / 48%);
+  font-size: 0.58rem;
+}
+
+.subtitleSelect {
+  width: 100%;
+  height: 28px;
+  padding: 0 7px;
+  color: #f0f2f9;
+  font: inherit;
+  font-size: 0.62rem;
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 6px;
+}
+
+.subtitleSelect option {
+  color: #f0f2f9;
+  background: #171b25;
+}
+
+.subtitleEmpty {
+  margin: 0;
+  color: rgb(255 255 255 / 58%);
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+
+.delayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.delayLabel {
+  margin-right: 2px;
+  color: rgb(255 255 255 / 50%);
+  font-size: 0.58rem;
+}
+
+.delayButton,
+.delayReset {
+  height: 24px;
+  padding: 0 6px;
+  color: rgb(255 255 255 / 72%);
+  font: inherit;
+  font-size: 0.56rem;
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.delayButton:hover,
+.delayReset:hover:not(:disabled) {
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.delayReset {
+  margin-left: auto;
+}
+
+.delayReset:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.delayValue {
+  min-width: 42px;
+  color: #f0f2f9;
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.subtitleDot {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  background: rgb(255 255 255 / 38%);
+  border-radius: 50%;
+}
+
+.subtitleDotActive {
+  background: var(--lime);
+  box-shadow: 0 0 0 2px rgb(206 243 107 / 18%);
+}
+
+@media (max-width: 680px) {
+  .toolbar {
+    padding: 28px 10px 8px;
+  }
+
+  .controlsRow {
+    gap: 4px;
+  }
+
+  .control {
+    width: 28px;
+    height: 28px;
+  }
+
+  .time {
+    min-width: 74px;
+    font-size: 0.56rem;
+  }
+
+  .volume {
+    display: none;
+  }
+
+  .rateButton {
+    min-width: 34px;
+    padding: 0 5px;
+    font-size: 0.56rem;
+  }
+
+  .subtitleDot {
+    right: 4px;
+    bottom: 4px;
+  }
+}
+
+@media (max-height: 620px) {
+  .toolbar {
+    padding-top: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar {
+    transition: none;
+  }
+}

@@ -1,5 +1,12 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setSessionPlaybackRate } from '../../lib/player-preferences';
 import { VideoPlayerDialog } from './VideoPlayerDialog';
 import type {
   VideoPlayerDialogProps,
@@ -67,11 +74,13 @@ function createProps(
     activeId: 'a',
     subtitleTracks: [],
     resumePosition: null,
+    isMinimized: false,
     onProgress: vi.fn<VideoPlayerDialogProps['onProgress']>(),
     onEnded: vi.fn<VideoPlayerDialogProps['onEnded']>(),
     onSelectPlaylist: vi.fn<VideoPlayerDialogProps['onSelectPlaylist']>(),
     onRetry: vi.fn<VideoPlayerDialogProps['onRetry']>(),
     onClose: vi.fn<VideoPlayerDialogProps['onClose']>(),
+    onMinimize: vi.fn<VideoPlayerDialogProps['onMinimize']>(),
     ...overrides,
   };
 }
@@ -98,6 +107,8 @@ function openPlaylistDrawer(): void {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
+  setSessionPlaybackRate(1);
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: 1200,
@@ -109,6 +120,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -116,7 +128,7 @@ describe('VideoPlayerDialog', () => {
   it('keeps the video mounted while toggling the playlist drawer', () => {
     const { container } = render(<VideoPlayerDialog {...createProps()} />);
     const video = videoElement(container);
-    const drawer = screen.getByLabelText('播放列表与字幕');
+    const drawer = screen.getByLabelText('播放列表');
 
     expect(
       screen
@@ -135,9 +147,9 @@ describe('VideoPlayerDialog', () => {
         .getByRole('button', { name: '收起播放列表' })
         .getAttribute('aria-expanded'),
     ).toBe('true');
-    expect(
-      screen.getByLabelText('播放列表与字幕').getAttribute('aria-hidden'),
-    ).toBe('false');
+    expect(screen.getByLabelText('播放列表').getAttribute('aria-hidden')).toBe(
+      'false',
+    );
     expect(videoElement(container)).toBe(video);
 
     fireEvent.click(screen.getByRole('button', { name: '收起播放列表' }));
@@ -147,9 +159,149 @@ describe('VideoPlayerDialog', () => {
         .getByRole('button', { name: '展开播放列表' })
         .getAttribute('aria-expanded'),
     ).toBe('false');
+    expect(screen.getByLabelText('播放列表').getAttribute('aria-hidden')).toBe(
+      'true',
+    );
+    expect(videoElement(container)).toBe(video);
+  });
+
+  it('controls playback, seek, volume, mute, and playback rate', () => {
+    const { container } = render(<VideoPlayerDialog {...createProps()} />);
+    const video = videoElement(container);
+    const playButton = screen.getByRole('button', { name: '播放' });
+
+    fireEvent.click(playButton);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+
+    fireEvent.play(video);
+    expect(screen.getByRole('button', { name: '暂停' })).toBeDefined();
+
+    Object.defineProperty(video, 'paused', {
+      configurable: true,
+      value: false,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '暂停' }));
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+    fireEvent.pause(video);
+
+    duration(video, 200);
+    fireEvent.loadedMetadata(video);
+
+    const seek = screen.getByLabelText('播放进度');
+
+    fireEvent.change(seek, { target: { value: '120' } });
+
+    expect(video.currentTime).toBe(120);
+    expect(seek.getAttribute('aria-valuetext')).toBe('2:00 / 3:20');
+
+    fireEvent.change(screen.getByLabelText('音量'), {
+      target: { value: '0.4' },
+    });
+
+    expect(video.volume).toBeCloseTo(0.4);
+    expect(window.localStorage.getItem('japp.player.volume')).toBe('0.4');
+
+    fireEvent.click(screen.getByRole('button', { name: '静音' }));
+
+    expect(video.muted).toBe(true);
+    expect(screen.getByRole('button', { name: '取消静音' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: '播放速度 1x' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '1.5x' }));
+
+    expect(video.playbackRate).toBe(1.5);
+    expect(screen.getByRole('button', { name: '播放速度 1.5x' })).toBeDefined();
+  });
+
+  it('restores volume and session playback rate after remount', () => {
+    const first = render(<VideoPlayerDialog {...createProps()} />);
+    const firstVideo = videoElement(first.container);
+
+    duration(firstVideo, 200);
+    fireEvent.loadedMetadata(firstVideo);
+    fireEvent.change(screen.getByLabelText('音量'), {
+      target: { value: '0.35' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '播放速度 1x' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '1.25x' }));
+
+    first.unmount();
+
+    const second = render(<VideoPlayerDialog {...createProps()} />);
+    const secondVideo = videoElement(second.container);
+
+    expect(secondVideo.volume).toBeCloseTo(0.35);
     expect(
-      screen.getByLabelText('播放列表与字幕').getAttribute('aria-hidden'),
-    ).toBe('true');
+      screen.getByRole('button', { name: '播放速度 1.25x' }),
+    ).toBeDefined();
+  });
+
+  it('supports keyboard seek and mute shortcuts', () => {
+    const { container } = render(<VideoPlayerDialog {...createProps()} />);
+    const video = videoElement(container);
+
+    duration(video, 200);
+    fireEvent.loadedMetadata(video);
+    video.currentTime = 100;
+
+    fireEvent.keyDown(document, { key: 'ArrowRight' });
+
+    expect(video.currentTime).toBe(105);
+
+    fireEvent.keyDown(document, { key: 'm' });
+
+    expect(video.muted).toBe(true);
+  });
+
+  it('auto-hides the toolbar while playing and reveals it on activity', () => {
+    vi.useFakeTimers();
+
+    const { container } = render(<VideoPlayerDialog {...createProps()} />);
+    const video = videoElement(container);
+    const stage = container.querySelector('div[class*="stage"]');
+
+    if (!stage) {
+      throw new Error('stage was not rendered');
+    }
+
+    fireEvent.play(video);
+    expect(screen.getByRole('toolbar').getAttribute('data-visible')).toBe(
+      'true',
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(2600);
+    });
+
+    expect(screen.getByRole('toolbar').getAttribute('data-visible')).toBe(
+      'false',
+    );
+
+    fireEvent.pointerMove(stage);
+
+    expect(screen.getByRole('toolbar').getAttribute('data-visible')).toBe(
+      'true',
+    );
+  });
+
+  it('minimizes without unmounting the video and can restore', () => {
+    const onMinimize = vi.fn<VideoPlayerDialogProps['onMinimize']>();
+    const props = createProps({ onMinimize });
+    const { container, rerender } = render(<VideoPlayerDialog {...props} />);
+    const video = videoElement(container);
+
+    fireEvent.click(screen.getByRole('button', { name: '最小化播放器' }));
+
+    expect(onMinimize).toHaveBeenCalledOnce();
+
+    rerender(<VideoPlayerDialog {...props} isMinimized />);
+
+    expect(screen.queryByRole('dialog', { name: /播放 Alpha/ })).toBeNull();
+    expect(videoElement(container)).toBe(video);
+
+    rerender(<VideoPlayerDialog {...props} isMinimized={false} />);
+
+    expect(screen.getByRole('dialog', { name: /播放 Alpha/ })).toBeDefined();
     expect(videoElement(container)).toBe(video);
   });
 
@@ -196,7 +348,7 @@ describe('VideoPlayerDialog', () => {
     const video = videoElement(container);
 
     duration(video, 100);
-    openPlaylistDrawer();
+    fireEvent.click(screen.getByRole('button', { name: '字幕设置' }));
 
     expect(
       screen.getByRole('option', { name: 'alpha.zh-CN.srt' }),
@@ -216,7 +368,7 @@ describe('VideoPlayerDialog', () => {
     fireEvent.click(
       screen.getByRole('button', { name: '字幕延迟增加 0.5 秒' }),
     );
-    expect(screen.getByText('0.5s')).toBeDefined();
+    expect(screen.getByText('+0.5s', { selector: 'span' })).toBeDefined();
     video.currentTime = 1.2;
     fireEvent.timeUpdate(video);
     expect(screen.queryByText('First subtitle')).toBeNull();

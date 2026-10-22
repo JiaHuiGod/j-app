@@ -1286,6 +1286,129 @@ describe('App', () => {
     });
   });
 
+  it('minimizes the player and restores it from another page', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: driveAccount.connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '77',
+            parentId: '0',
+            name: 'movie.mp4',
+            kind: 'file',
+            size: 2048,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 120,
+            pickcode: 'video-pickcode',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 1,
+        hasMore: false,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('movie.mp4'));
+    fireEvent.click(screen.getByRole('button', { name: '播放' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /播放 movie\.mp4/,
+    });
+    const video = dialog.querySelector('video');
+
+    if (!video) {
+      throw new Error('player video was not rendered');
+    }
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: '最小化播放器' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: /播放 movie\.mp4/ }),
+      ).toBeNull();
+    });
+    expect(stopDrivePlayback).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: '恢复播放 movie.mp4' }),
+    ).toBeDefined();
+    expect(screen.getByRole('button', { name: '播放视频' })).toBeDefined();
+
+    fireEvent.play(video);
+
+    expect(
+      await screen.findByRole('button', { name: '暂停视频' }),
+    ).toBeDefined();
+
+    const pauseSpy = vi
+      .spyOn(HTMLMediaElement.prototype, 'pause')
+      .mockImplementation(() => {});
+
+    Object.defineProperty(video, 'paused', {
+      configurable: true,
+      value: false,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '暂停视频' }));
+
+    expect(pauseSpy).toHaveBeenCalled();
+    fireEvent.pause(video);
+    expect(
+      await screen.findByRole('button', { name: '播放视频' }),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByRole('heading', { level: 1, name: /设置/ });
+
+    const restoreButton = screen.getByRole('button', {
+      name: '恢复播放 movie.mp4',
+    });
+
+    fireEvent.click(restoreButton);
+
+    const restoredDialog = await screen.findByRole('dialog', {
+      name: /播放 movie\.mp4/,
+    });
+
+    expect(restoredDialog.querySelector('video')).toBe(video);
+    expect(startDrivePlayback).toHaveBeenCalledOnce();
+    expect(stopDrivePlayback).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(restoredDialog).getByRole('button', {
+        name: '最小化播放器',
+      }),
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: '关闭播放 movie.mp4',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(stopDrivePlayback).toHaveBeenCalledWith('playback-session');
+    });
+    expect(
+      screen.queryByRole('button', { name: '恢复播放 movie.mp4' }),
+    ).toBeNull();
+  });
+
   it('resumes a video and supports subtitles and playlist navigation', async () => {
     const connectionId = driveAccount.connectionId;
 
@@ -1365,9 +1488,7 @@ describe('App', () => {
     const dialog = await screen.findByRole('dialog', {
       name: /播放 first\.mp4/,
     });
-    fireEvent.click(
-      within(dialog).getByRole('button', { name: '展开播放列表' }),
-    );
+    fireEvent.click(within(dialog).getByRole('button', { name: '字幕设置' }));
     await waitFor(() => {
       expect(getDriveSubtitles).toHaveBeenCalledWith('first.mp4');
       expect(
@@ -1378,6 +1499,9 @@ describe('App', () => {
     expect(
       within(dialog).getByRole('button', { name: '关闭字幕' }),
     ).toBeTruthy();
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: '展开播放列表' }),
+    );
     expect(within(dialog).getByTitle('second.mp4')).toBeTruthy();
     fireEvent.click(within(dialog).getByTitle('second.mp4'));
 

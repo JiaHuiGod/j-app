@@ -1261,45 +1261,6 @@
   }
 }
 
-.playbackError {
-  position: fixed;
-  bottom: 24px;
-  left: 24px;
-  z-index: 35;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  max-width: min(440px, calc(100vw - 48px));
-  padding: 10px 12px;
-  color: #992d32;
-  font-size: 0.68rem;
-  line-height: 1.5;
-  background: #fff0f0;
-  border: 1px solid #f1c9cb;
-  border-radius: 10px;
-  box-shadow: 0 16px 40px -24px rgb(23 25 31 / 35%);
-}
-
-.playbackError button {
-  flex: none;
-  padding: 0;
-  color: currentColor;
-  font: inherit;
-  font-size: 1rem;
-  line-height: 1;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-@media (prefers-color-scheme: dark) {
-  .playbackError {
-    color: #ffb1b4;
-    background: rgb(108 29 34 / 30%);
-    border-color: rgb(255 123 128 / 25%);
-  }
-}
-
 @media (prefers-color-scheme: dark) {
   .dropPanel {
     border-color: rgb(100 126 255 / 34%);

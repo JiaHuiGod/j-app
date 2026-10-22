@@ -8,6 +8,7 @@ import type { AppPage } from './navigation';
 import { DrivePage } from './pages/DrivePage';
 import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DrivePlaybackProvider } from './playback/DrivePlaybackProvider';
 
 function App() {
   const [activePage, setActivePage] = useState<AppPage>('overview');
@@ -57,52 +58,56 @@ function App() {
   };
 
   return (
-    <div className="app-window">
-      <TitleBar
-        activePage={activePage}
-        isThemeLoading={appearance.isLoading}
-        isThemeSaving={appearance.isSaving}
-        proxyEnabled={proxyEnabled}
-        themeError={appearance.error}
-        themePreference={appearance.preference}
-        onNavigate={handleNavigate}
-        onOpenProxySettings={() => {
-          setIsProxyDialogOpen(true);
-        }}
-        onSelectTheme={handleSelectTheme}
-      />
-
-      <div className="app-shell" ref={appShellRef}>
-        {activePage === 'overview' && <OverviewPage />}
-
-        {hasVisitedDrive && (
-          <div className="page-slot" hidden={activePage !== 'drive'}>
-            <DrivePage
-              isActive={activePage === 'drive'}
-              onOpenSettings={() => {
-                handleNavigate('settings');
-              }}
-            />
-          </div>
-        )}
-
-        {activePage === 'settings' && <SettingsPage appearance={appearance} />}
-
-        <footer className="app-footer">
-          <span>J App · 本地优先</span>
-          <span className="footer-note">配置与登录数据保存在本机</span>
-        </footer>
-      </div>
-
-      {isProxyDialogOpen && (
-        <ProxyDialog
-          onClose={() => {
-            setIsProxyDialogOpen(false);
+    <DrivePlaybackProvider>
+      <div className="app-window">
+        <TitleBar
+          activePage={activePage}
+          isThemeLoading={appearance.isLoading}
+          isThemeSaving={appearance.isSaving}
+          proxyEnabled={proxyEnabled}
+          themeError={appearance.error}
+          themePreference={appearance.preference}
+          onNavigate={handleNavigate}
+          onOpenProxySettings={() => {
+            setIsProxyDialogOpen(true);
           }}
-          onSaved={handleProxySaved}
+          onSelectTheme={handleSelectTheme}
         />
-      )}
-    </div>
+
+        <div className="app-shell" ref={appShellRef}>
+          {activePage === 'overview' && <OverviewPage />}
+
+          {hasVisitedDrive && (
+            <div className="page-slot" hidden={activePage !== 'drive'}>
+              <DrivePage
+                isActive={activePage === 'drive'}
+                onOpenSettings={() => {
+                  handleNavigate('settings');
+                }}
+              />
+            </div>
+          )}
+
+          {activePage === 'settings' && (
+            <SettingsPage appearance={appearance} />
+          )}
+
+          <footer className="app-footer">
+            <span>J App · 本地优先</span>
+            <span className="footer-note">配置与登录数据保存在本机</span>
+          </footer>
+        </div>
+
+        {isProxyDialogOpen && (
+          <ProxyDialog
+            onClose={() => {
+              setIsProxyDialogOpen(false);
+            }}
+            onSaved={handleProxySaved}
+          />
+        )}
+      </div>
+    </DrivePlaybackProvider>
   );
 }
 

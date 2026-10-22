@@ -55,48 +55,54 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 
 关键文件：
 
-| 文件                                                  | 职责                                    |
-| ----------------------------------------------------- | --------------------------------------- |
-| `src/shared/drive.ts`                                 | 网盘账号、目录、文件操作和上传契约      |
-| `src/main/drive/accounts.ts`                          | 将 115 站点连接映射为网盘账号           |
-| `src/main/drive/detection.ts`                         | 识别 115 登录地址                       |
-| `src/main/drive/115.ts`                               | 115 登录探针、目录列表、当前目录搜索    |
-| `src/main/drive/115-http.ts`                          | 显式 Cookie 请求、JSON 响应与错误映射   |
-| `src/main/drive/actions.ts`                           | 新建、重命名、移动、删除                |
-| `src/main/drive/offline.ts`                           | 离线任务签名、提交和任务列表            |
-| `src/main/drive/offline-mapper.ts`                    | 离线任务状态、进度和分页归一化          |
-| `src/main/drive/download.ts`                          | 视频下载地址、保存对话框和流式下载      |
-| `src/main/drive/playback.ts`                          | 播放会话、本机代理与 m3u8 重写          |
-| `src/main/drive/subtitles.ts`                         | 本地字幕目录读取与内容解码              |
-| `src/main/drive/subtitle-matcher.ts`                  | 视频与字幕文件名匹配                    |
-| `src/main/drive/upload.ts`                            | 115 上传初始化、OSS 流式上传与进度      |
-| `src/main/drive/mapper.ts`                            | 115 响应归一化、HTML 标签清理、分页状态 |
-| `src/main/drive/ipc.ts`                               | 网盘 IPC 处理器                         |
-| `src/renderer/pages/DrivePage.tsx`                    | 网盘页交互与状态                        |
-| `src/renderer/pages/DrivePage.module.css`             | 紧凑页头、搜索、列表和响应式样式        |
-| `src/renderer/hooks/useDrivePlayback.ts`              | 115 播放适配：会话、竞态、进度和连播    |
-| `src/renderer/components/video-player/`               | 通用 HLS 播放器、播放列表抽屉和字幕面板 |
-| `src/renderer/lib/drive-playlist.ts`                  | 当前目录视频过滤、自然排序与短标题      |
-| `src/renderer/lib/file-kind.ts`                       | 扩展名到文件类型的统一映射              |
-| `src/renderer/components/DriveActionDialog.tsx`       | 新建、重命名、删除确认对话框            |
-| `src/renderer/components/DriveMoveDialog.tsx`         | 目标目录选择与移动                      |
-| `src/renderer/components/DriveFolderPickerDialog.tsx` | 离线任务保存目录选择                    |
-| `src/renderer/components/DriveUploadPanel.tsx`        | 上传进度面板                            |
-| `src/renderer/components/DriveOfflineDialog.tsx`      | 离线任务提交与列表                      |
-| `src/renderer/components/DriveDownloadPanel.tsx`      | 视频下载进度与结果                      |
-| `src/renderer/lib/playback-progress.ts`               | 按文件和站点保存播放进度                |
-| `src/renderer/lib/subtitles.ts`                       | SRT、VTT、ASS、SSA 解析                 |
-| `src/renderer/components/DownloadSettings.tsx`        | 设置页下载和字幕目录                    |
+| 文件                                                          | 职责                                    |
+| ------------------------------------------------------------- | --------------------------------------- |
+| `src/shared/drive.ts`                                         | 网盘账号、目录、文件操作和上传契约      |
+| `src/main/drive/accounts.ts`                                  | 将 115 站点连接映射为网盘账号           |
+| `src/main/drive/detection.ts`                                 | 识别 115 登录地址                       |
+| `src/main/drive/115.ts`                                       | 115 登录探针、目录列表、当前目录搜索    |
+| `src/main/drive/115-http.ts`                                  | 显式 Cookie 请求、JSON 响应与错误映射   |
+| `src/main/drive/actions.ts`                                   | 新建、重命名、移动、删除                |
+| `src/main/drive/offline.ts`                                   | 离线任务签名、提交和任务列表            |
+| `src/main/drive/offline-mapper.ts`                            | 离线任务状态、进度和分页归一化          |
+| `src/main/drive/download.ts`                                  | 视频下载地址、保存对话框和流式下载      |
+| `src/main/drive/playback.ts`                                  | 播放会话、本机代理与 m3u8 重写          |
+| `src/main/drive/subtitles.ts`                                 | 本地字幕目录读取与内容解码              |
+| `src/main/drive/subtitle-matcher.ts`                          | 视频与字幕文件名匹配                    |
+| `src/main/drive/upload.ts`                                    | 115 上传初始化、OSS 流式上传与进度      |
+| `src/main/drive/mapper.ts`                                    | 115 响应归一化、HTML 标签清理、分页状态 |
+| `src/main/drive/ipc.ts`                                       | 网盘 IPC 处理器                         |
+| `src/renderer/pages/DrivePage.tsx`                            | 网盘页交互与状态                        |
+| `src/renderer/pages/DrivePage.module.css`                     | 紧凑页头、搜索、列表和响应式样式        |
+| `src/renderer/playback/DrivePlaybackProvider.tsx`             | 全局播放宿主、最小化悬浮按钮与错误提示  |
+| `src/renderer/hooks/useDrivePlayback.ts`                      | 115 播放适配：会话、竞态、进度和连播    |
+| `src/renderer/components/video-player/`                       | 通用 HLS 播放器、工具栏、播放列表抽屉   |
+| `src/renderer/components/video-player/VideoPlayerToolbar.tsx` | 播放、进度、音量、倍速、字幕和全屏控件  |
+| `src/renderer/components/video-player/useVideoMediaState.ts`  | 媒体状态同步与播放控制                  |
+| `src/renderer/lib/player-preferences.ts`                      | 音量/静音记忆和会话级倍速               |
+| `src/renderer/lib/drive-playlist.ts`                          | 当前目录视频过滤、自然排序与短标题      |
+| `src/renderer/lib/file-kind.ts`                               | 扩展名到文件类型的统一映射              |
+| `src/renderer/components/DriveActionDialog.tsx`               | 新建、重命名、删除确认对话框            |
+| `src/renderer/components/DriveMoveDialog.tsx`                 | 目标目录选择与移动                      |
+| `src/renderer/components/DriveFolderPickerDialog.tsx`         | 离线任务保存目录选择                    |
+| `src/renderer/components/DriveUploadPanel.tsx`                | 上传进度面板                            |
+| `src/renderer/components/DriveOfflineDialog.tsx`              | 离线任务提交与列表                      |
+| `src/renderer/components/DriveDownloadPanel.tsx`              | 视频下载进度与结果                      |
+| `src/renderer/lib/playback-progress.ts`                       | 按文件和站点保存播放进度                |
+| `src/renderer/lib/subtitles.ts`                               | SRT、VTT、ASS、SSA 解析                 |
+| `src/renderer/components/DownloadSettings.tsx`                | 设置页下载和字幕目录                    |
 
 ### 视频播放分层
 
-播放器拆成通用层和 115 适配层：
+播放器拆成通用层、115 适配层和全局宿主：
 
-- `video-player/VideoPlayerDialog` 只接收 `source`、`title`、`playlist`、`activeId`、`subtitleTracks`、`resumePosition`、`isLoading`、`error` 和回调；HLS、字幕渲染、续播提示、可折叠抽屉与响应式都留在这一层，不访问 `window.desktop`，也不导入 `@shared/drive`。
+- `video-player/VideoPlayerDialog` 只接收 `source`、`title`、`playlist`、`activeId`、`subtitleTracks`、`resumePosition`、`isLoading`、`error` 和回调；HLS、自定义工具栏、字幕菜单、续播提示、可折叠抽屉与响应式都留在这一层，不访问 `window.desktop`，也不导入 `@shared/drive`。
+- `playback/DrivePlaybackProvider` 在 `App` 根部常驻，负责渲染播放器、最小化悬浮按钮和全局播放错误；播放器不再挂在 `DrivePage` 内，因此切换页面不会卸载视频。
 - `useDrivePlayback` 负责 `startPlayback` / `stopPlayback`、本地字幕读取、播放进度读写、当前目录视频排序、原地切换、自动连播和错误文案映射。
 - 每次播放请求携带递增序号；过期请求成功时只停止它自己的会话，不覆盖当前视频；新会话成功后才停止旧会话；切换失败时保留当前播放器。
 - 关闭播放器会立即停止当前会话并使所有在途请求失效；在途请求随后返回的会话会被回收。
 - 暂停、播放结束、切换和关闭都由通用播放器先上报进度，再由适配层按当前文件写入 localStorage；媒体元数据就绪前不上报，避免把旧视频的进度记到新视频上。
+- 音量、静音写入 localStorage，切换视频和应用重启后保留；播放速度只保存在本次渲染进程会话中，切换视频不重置，重启应用恢复 `1x`。
 
 ## 3. 账号与登录
 
@@ -223,8 +229,14 @@ GET https://webapi.115.com/files/video?pickcode=<pc>
 - 播放进度按“站点连接 + 文件 ID”保存在 renderer 的 localStorage 中，播放中每 4 秒、暂停、关闭和切换视频时写入；
 - 再次打开同一视频时自动跳转并显示“继续观看”，可一键从头播放；接近结尾或刚开始播放的进度不保存；
 - 当前目录中的视频按文件名自然排序，播放器右侧显示默认折叠的半透明抽屉式播放列表和当前项；抽屉覆盖在视频上，展开/收起不改变播放器尺寸；激活项只滚动播放列表自身，不会带动弹窗横向移动；点击列表项直接切换；播放结束后自动播放下一集；
+- 播放器使用自定义工具栏替代原生 controls：播放/暂停、进度、时间、音量/静音、倍速、字幕和全屏；播放中鼠标静止 2.5 秒后工具栏淡出，暂停、悬停、聚焦、拖动进度或打开菜单时保持显示；
+- 快捷键：`Space`/`K` 播放暂停，`←`/`→` 前后 5 秒，`↑`/`↓` 调整音量，`M` 静音，`F` 全屏，`C` 字幕开关；拖到视频画面单击播放暂停，双击全屏；
+- 音量与静音全局记忆，切换视频后保留；倍速在本次应用会话内保留，切换视频不重置，重启恢复 `1x`；
+- 播放器可最小化到右下角悬浮按钮；最小化后视频继续播放，切换到其他页面后悬浮按钮仍可见，点击可恢复原弹窗和播放位置，也可直接从悬浮按钮关闭播放；
+- 悬浮按钮左侧提供播放/暂停控制，图标随视频状态同步；悬停时整个悬浮条上浮并轻微放大，内部按钮不再单独改变背景；
+- 悬浮按钮显示精简文件名并限制最大宽度，长文件名会省略；播放器打开和最小化使用类似 macOS 窗口的缩放、下坠和模糊过渡，并尊重 `prefers-reduced-motion`；
 - 字幕使用设置页配置的本地字幕目录，读取 SRT、VTT、ASS、SSA；按文件名、番号/集数、语言后缀匹配，只加载匹配项；
-- 字幕面板始终显示在播放列表下方；匹配到字幕后提供开关、候选切换和 ±0.5 秒延迟调整，无匹配时显示“未匹配到本地字幕”；
+- 字幕控制在工具栏“字幕”菜单内：开关、候选切换、±0.5 秒延迟和重置延迟；无匹配时显示“未匹配到本地字幕”；
 - 115 视频接口未提供可直接挂载的 WebVTT 字幕轨道，因此当前字幕来源为本地目录，不向 renderer 传入任意文件路径。
 
 ### 离线任务
@@ -279,10 +291,9 @@ type DriveResult<T> =
 - 如果上传完成时不在网盘页，成功结果面板不会开始自动消失；回到网盘页后再开始计时；
 - 离线任务弹窗支持多链接提交，可通过目录选择器更改保存目录；任务列表只显示本次提交的链接对应的状态、进度和速率；
 - 选中单个视频文件时显示“播放”和“下载”；也可双击视频文件直接播放；
-- 播放器支持暂停、拖动进度、音量、倍速和全屏，关闭时释放播放会话；
+- 播放器提供自定义工具栏（播放、进度、音量、倍速、字幕、全屏），最小化后右下角显示可播放/暂停、恢复或直接关闭的悬浮按钮，悬停有整体上浮动画；
 - 已有播放进度时，选中项会显示“继续观看 mm:ss”，打开播放器自动续播并显示继续观看提示；
-- 播放器右侧显示默认折叠的半透明抽屉式播放列表和常驻字幕面板；播放结束自动进入下一集；
-- 本地字幕自动匹配后显示字幕开关、字幕选择和 ±0.5 秒延迟调整；
+- 播放器右侧显示默认折叠的半透明抽屉式播放列表；字幕开关、选择和延迟调整位于底部工具栏的字幕菜单内；播放结束自动进入下一集；
 - 选择保存位置后显示下载进度和实时下载速度，可随时取消；下载完成后可点击“打开下载目录”；
 - 设置页可以配置默认下载目录和本地字幕目录；网盘页在选中视频时显示当前默认目录，保存对话框仍可临时更改；
 - 加载目录或搜索时显示与真实列表相同列模板的骨架，并保留“名称 / 大小 / 修改时间”表头，数据返回后不会发生列错位；
@@ -335,9 +346,14 @@ type DriveResult<T> =
 - 已实际发起真实视频下载，确认加入接口 Set-Cookie 后 CDN 返回正常并开始写入；面板显示实时速度，取消后确认 `.japp-part` 已删除；
 - 已实际播放真实 115 视频，浏览器媒体状态达到可播放（`readyState=4`），时长和播放进度正常；
 - 重构后使用临时用户目录副本再次实际验证：真实 115 视频可播放，字幕轨道可加载/开关并渲染字幕，关闭后重新打开会续播，播放列表切换时弹窗和 `<video>` 元素保持不变；验证未修改真实 `settings.json`、Cookie 或字幕目录；
+- 自定义工具栏实际验证：播放、暂停、静音、1.5x 倍速、字幕菜单、全屏进入/退出正常；播放中鼠标静止后工具栏隐藏，移动后恢复显示；
+- 最小化实际验证：最小化后弹窗关闭但 `<video>` 保持同一个 DOM 节点并继续播放（2 秒内进度前进约 2 秒）；切换到设置页后悬浮按钮仍可见，点击恢复同一视频、播放位置、音量和倍速；
+- 动画实际验证：打开/恢复弹窗检测到 320ms 缩放淡入，最小化检测到 280ms 缩放下坠；动画结束或 360ms 兜底后弹窗关闭并出现悬浮按钮；
+- 悬浮窗实际验证：长文件名会显示精简名称并省略，实测宽度约 140px；左侧图标可在不恢复弹窗的情况下暂停/继续视频，图标同步切换；悬停时整体上浮到 `translateY(-2px) scale(1.015)`，内部按钮背景保持透明；右侧关闭按钮可直接结束播放并移除弹窗和悬浮按钮；
+- 播放列表滚动条实测为 `thin` 低对比度样式，悬停时才提高可见度；
 - 播放器打开和关闭有界面测试覆盖，关闭时调用停止播放会话接口；
 - 字幕文件名匹配、SRT/ASS 解析、播放进度保存与格式化为单元测试覆盖；
-- 续播入口、字幕选择/开关和原地切换有界面测试覆盖；抽屉开关、通用播放器错误恢复、切换竞态、关闭清理和自动连播有组件/适配层测试覆盖；
+- 续播入口、字幕选择/开关和原地切换有界面测试覆盖；抽屉开关、工具栏控制、自动隐藏、最小化跨页面恢复、通用播放器错误恢复、切换竞态、关闭清理和自动连播有组件/适配层测试覆盖；
 - 下载按钮、保存目录结果、进度面板、取消操作和打开目录有界面测试覆盖；
 - 已定位 CDN 403 的原因：下载请求缺少视频接口返回的一次性 Set-Cookie；同时改用 115 站点分区 session；
 - 上传大文件采用流式读取，但进度回调节流和断点续传尚未实现；
@@ -345,4 +361,4 @@ type DriveResult<T> =
 - 视频下载支持取消，但不支持暂停或继续；
 - 播放暂不支持手动清晰度和字幕时间轴微调以外的字幕样式设置；自动连播基于当前已加载的当前目录视频；
 - 115 视频接口未提供可直接挂载的字幕轨道，当前字幕来源为本地目录；
-- 88 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。
+- 94 个 Vitest 测试全部通过，`pnpm check` 和打包构建通过。

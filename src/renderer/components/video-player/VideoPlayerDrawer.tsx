@@ -1,19 +1,12 @@
 import { useLayoutEffect, useRef } from 'react';
-import type { VideoPlaylistItem, VideoSubtitleTrack } from './types';
+import type { VideoPlaylistItem } from './types';
 import styles from './VideoPlayerDialog.module.css';
 
 interface VideoPlayerDrawerProps {
   readonly open: boolean;
   readonly playlist: readonly VideoPlaylistItem[];
   readonly activeId: string | null;
-  readonly subtitleTracks: readonly VideoSubtitleTrack[];
-  readonly subtitleIndex: number;
-  readonly subtitlesEnabled: boolean;
-  readonly subtitleDelay: number;
   readonly onSelectPlaylist: (id: string) => void;
-  readonly onSubtitleIndexChange: (index: number) => void;
-  readonly onToggleSubtitles: () => void;
-  readonly onSubtitleDelayChange: (delta: number) => void;
 }
 
 function playlistLabel(item: VideoPlaylistItem): string {
@@ -47,14 +40,7 @@ export function VideoPlayerDrawer({
   open,
   playlist,
   activeId,
-  subtitleTracks,
-  subtitleIndex,
-  subtitlesEnabled,
-  subtitleDelay,
   onSelectPlaylist,
-  onSubtitleIndexChange,
-  onToggleSubtitles,
-  onSubtitleDelayChange,
 }: VideoPlayerDrawerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +62,7 @@ export function VideoPlayerDrawer({
   return (
     <aside
       aria-hidden={!open}
-      aria-label="播放列表与字幕"
+      aria-label="播放列表"
       className={`${styles.sidebar} ${open ? styles.sidebarOpen : ''}`}
     >
       <div className={styles.sidebarHeader}>
@@ -119,69 +105,6 @@ export function VideoPlayerDrawer({
           })
         )}
       </div>
-
-      <section className={styles.subtitlePanel}>
-        <div className={styles.subtitleHeader}>
-          <span className={styles.subtitleLabel}>字幕</span>
-          {subtitleTracks.length > 0 && (
-            <button
-              aria-label={subtitlesEnabled ? '关闭字幕' : '开启字幕'}
-              className={styles.subtitleToggle}
-              type="button"
-              onClick={onToggleSubtitles}
-            >
-              {subtitlesEnabled ? '开启' : '关闭'}
-            </button>
-          )}
-        </div>
-
-        {subtitleTracks.length > 0 ? (
-          <>
-            <select
-              aria-label="选择字幕"
-              className={styles.subtitleSelect}
-              value={subtitleIndex}
-              onChange={(event) => {
-                onSubtitleIndexChange(Number(event.target.value));
-              }}
-            >
-              {subtitleTracks.map((track, index) => (
-                <option key={track.id} value={index}>
-                  {track.label}
-                </option>
-              ))}
-            </select>
-            <div className={styles.delayRow}>
-              <span className={styles.delayLabel}>延迟</span>
-              <button
-                aria-label="字幕延迟减少 0.5 秒"
-                className={styles.delayButton}
-                type="button"
-                onClick={() => {
-                  onSubtitleDelayChange(-0.5);
-                }}
-              >
-                −0.5s
-              </button>
-              <span className={styles.delayValue}>
-                {subtitleDelay.toFixed(1)}s
-              </span>
-              <button
-                aria-label="字幕延迟增加 0.5 秒"
-                className={styles.delayButton}
-                type="button"
-                onClick={() => {
-                  onSubtitleDelayChange(0.5);
-                }}
-              >
-                +0.5s
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className={styles.subtitleEmpty}>未匹配到本地字幕</p>
-        )}
-      </section>
     </aside>
   );
 }

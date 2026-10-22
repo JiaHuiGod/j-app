@@ -15,14 +15,7 @@ function createProps(overrides: Partial<DrawerProps> = {}): DrawerProps {
     open: false,
     playlist,
     activeId: 'video-15',
-    subtitleTracks: [],
-    subtitleIndex: -1,
-    subtitlesEnabled: true,
-    subtitleDelay: 0,
     onSelectPlaylist: vi.fn<DrawerProps['onSelectPlaylist']>(),
-    onSubtitleIndexChange: vi.fn<DrawerProps['onSubtitleIndexChange']>(),
-    onToggleSubtitles: vi.fn<DrawerProps['onToggleSubtitles']>(),
-    onSubtitleDelayChange: vi.fn<DrawerProps['onSubtitleDelayChange']>(),
     ...overrides,
   };
 }

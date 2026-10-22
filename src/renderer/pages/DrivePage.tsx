@@ -23,8 +23,7 @@ import {
   formatPlaybackPosition,
   getPlaybackProgress,
 } from '../lib/playback-progress';
-import { VideoPlayerDialog } from '../components/video-player';
-import { useDrivePlayback } from '../hooks/useDrivePlayback';
+import { useDrivePlaybackController } from '../playback/DrivePlaybackProvider';
 import { DriveActionDialog } from '../components/DriveActionDialog';
 import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
@@ -776,10 +775,12 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const cancelRequestedRef = useRef(false);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
-  const playback = useDrivePlayback({
-    connectionId: account?.connectionId ?? null,
-    entries,
-  });
+  const playback = useDrivePlaybackController();
+  const setPlaybackPlaylist = playback.setPlaylist;
+
+  useEffect(() => {
+    setPlaybackPlaylist(account?.connectionId ?? null, entries);
+  }, [account?.connectionId, entries, setPlaybackPlaylist]);
 
   const currentBreadcrumb =
     breadcrumbs[breadcrumbs.length - 1] ?? ROOT_BREADCRUMB;
@@ -2221,37 +2222,6 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
             offlineSubmittedRef.current = true;
           }}
         />
-      )}
-
-      {playback.player && (
-        <VideoPlayerDialog
-          activeId={playback.player.activeId}
-          isLoading={playback.player.isSwitching}
-          kicker="115 / PLAYBACK"
-          playlist={playback.player.playlist}
-          resumePosition={playback.player.resumePosition}
-          source={playback.player.source}
-          subtitleTracks={playback.player.subtitleTracks}
-          title={playback.player.title}
-          onClose={playback.close}
-          onEnded={playback.handleEnded}
-          onProgress={playback.reportProgress}
-          onRetry={playback.retry}
-          onSelectPlaylist={playback.selectPlaylist}
-        />
-      )}
-
-      {playback.error && (
-        <div className={styles.playbackError} role="alert">
-          <span>{playback.error}</span>
-          <button
-            aria-label="关闭播放错误提示"
-            type="button"
-            onClick={playback.dismissError}
-          >
-            ×
-          </button>
-        </div>
       )}
 
       {uploadBatch && (

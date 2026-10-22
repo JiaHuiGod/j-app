@@ -27,6 +27,7 @@ export interface VideoPlayerDialogProps {
   readonly activeId: string | null;
   readonly subtitleTracks: readonly VideoSubtitleTrack[];
   readonly resumePosition: number | null;
+  readonly isMinimized: boolean;
   readonly isLoading?: boolean;
   readonly error?: string | null;
   readonly kicker?: string;
@@ -35,4 +36,7 @@ export interface VideoPlayerDialogProps {
   readonly onSelectPlaylist: (id: string) => void;
   readonly onRetry: () => void;
   readonly onClose: () => void;
+  readonly onMinimize: () => void;
+  readonly onPlayingChange?: (isPlaying: boolean) => void;
+  readonly onRegisterPlaybackToggle?: (toggle: (() => void) | null) => void;
 }
