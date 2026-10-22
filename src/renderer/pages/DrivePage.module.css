@@ -501,7 +501,8 @@
 }
 
 .tableHead,
-.fileRow {
+.fileRow,
+.skeletonRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 100px 140px 26px;
   gap: 16px;
@@ -707,24 +708,27 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
   min-height: 0;
-  padding: 8px 8px;
+  padding: 4px 8px;
   overflow: hidden;
 }
 
 .skeletonRow {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 110px;
-  gap: 11px;
-  align-items: center;
   min-height: 58px;
   padding: 6px 12px;
 }
 
+.skeletonNameCell {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+}
+
 .skeletonIcon,
 .skeletonName,
-.skeletonMeta {
+.skeletonSize,
+.skeletonDate {
   height: 9px;
   background: linear-gradient(
     90deg,
@@ -738,6 +742,7 @@
 }
 
 .skeletonIcon {
+  flex: none;
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -747,8 +752,12 @@
   width: 38%;
 }
 
-.skeletonMeta {
-  width: 70%;
+.skeletonSize {
+  width: 64%;
+}
+
+.skeletonDate {
+  width: 72%;
   justify-self: end;
 }
 
@@ -975,7 +984,8 @@
 
   .skeletonIcon,
   .skeletonName,
-  .skeletonMeta {
+  .skeletonSize,
+  .skeletonDate {
     background: linear-gradient(
       90deg,
       rgb(255 255 255 / 5%) 20%,
@@ -1008,7 +1018,8 @@
 
 @media (max-width: 980px) {
   .tableHead,
-  .fileRow {
+  .fileRow,
+  .skeletonRow {
     grid-template-columns: minmax(0, 1fr) 82px 112px 24px;
     gap: 12px;
   }
@@ -1126,11 +1137,18 @@
     padding: 4px 8px;
   }
 
-  .fileRow {
+  .fileRow,
+  .skeletonRow {
     grid-template-columns: minmax(0, 1fr) 22px;
     gap: 8px;
     min-height: 58px;
     padding: 7px 9px;
+  }
+
+  .skeletonSize,
+  .skeletonDate,
+  .skeletonChevron {
+    display: none;
   }
 
   .fileSize,

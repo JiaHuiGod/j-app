@@ -548,6 +548,40 @@ describe('App', () => {
     });
   });
 
+  it('keeps the table header visible while a 115 folder is loading', async () => {
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+
+    let resolveFolder!: (
+      value: Awaited<ReturnType<DriveApi['listFolder']>>,
+    ) => void;
+    listDriveFolder.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFolder = resolve;
+      }),
+    );
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+
+    expect(await screen.findByText('名称')).toBeDefined();
+    expect(screen.getByText('大小')).toBeDefined();
+    expect(screen.getByText('修改时间')).toBeDefined();
+
+    await act(async () => {
+      resolveFolder({ ok: true, data: driveRootListing });
+    });
+
+    expect(await screen.findByText('电影')).toBeDefined();
+    expect(screen.getByText('名称')).toBeDefined();
+  });
+
   it('keeps the current folder when leaving and returning to drive', async () => {
     listDriveAccounts.mockResolvedValue({
       ok: true,
@@ -1331,6 +1365,9 @@ describe('App', () => {
     const dialog = await screen.findByRole('dialog', {
       name: /播放 first\.mp4/,
     });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: '展开播放列表' }),
+    );
     await waitFor(() => {
       expect(getDriveSubtitles).toHaveBeenCalledWith('first.mp4');
       expect(

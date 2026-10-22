@@ -1,4 +1,4 @@
-import type { DriveSubtitleFormat } from '@shared/drive';
+export type SubtitleFormat = 'ass' | 'srt' | 'ssa' | 'vtt';
 
 export interface SubtitleCue {
   readonly start: number;
@@ -141,7 +141,7 @@ function parseAss(content: string): SubtitleCue[] {
 
 export function parseSubtitle(
   content: string,
-  format: DriveSubtitleFormat,
+  format: SubtitleFormat,
 ): SubtitleCue[] {
   return format === 'ass' || format === 'ssa'
     ? parseAss(content)

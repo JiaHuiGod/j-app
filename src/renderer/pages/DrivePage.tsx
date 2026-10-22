@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -14,22 +13,22 @@ import type {
   DriveEntry,
   DriveError,
   DriveResult,
-  DrivePlaybackResult,
   DriveUploadProgress,
   DriveUploadResult,
   DriveVideoDownloadProgress,
 } from '@shared/drive';
 import { toErrorMessage } from '../lib/errors';
+import { getFileKind, type FileKind } from '../lib/file-kind';
 import {
   formatPlaybackPosition,
   getPlaybackProgress,
-  savePlaybackProgress,
 } from '../lib/playback-progress';
+import { VideoPlayerDialog } from '../components/video-player';
+import { useDrivePlayback } from '../hooks/useDrivePlayback';
 import { DriveActionDialog } from '../components/DriveActionDialog';
 import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
 import { DriveOfflineDialog } from '../components/DriveOfflineDialog';
-import { DrivePlayerDialog } from '../components/DrivePlayerDialog';
 import { DriveUploadPanel } from '../components/DriveUploadPanel';
 import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
@@ -58,12 +57,6 @@ interface UploadBatchState {
   readonly items: Readonly<Record<string, DriveUploadProgress>>;
   readonly result: DriveUploadResult | null;
   readonly error: string | null;
-}
-
-interface ActivePlayback {
-  readonly entry: DriveEntry;
-  readonly playback: DrivePlaybackResult;
-  readonly resumePosition: number | null;
 }
 
 const PAGE_SIZE = 100;
@@ -177,103 +170,6 @@ function FolderIcon() {
       <path d="M2.7 8.1h14.6" />
     </svg>
   );
-}
-
-type FileKind =
-  | 'archive'
-  | 'audio'
-  | 'code'
-  | 'image'
-  | 'package'
-  | 'pdf'
-  | 'sheet'
-  | 'slides'
-  | 'text'
-  | 'unknown'
-  | 'video';
-
-const FILE_KIND_BY_EXTENSION: Readonly<Record<string, FileKind>> = {
-  '7z': 'archive',
-  aac: 'audio',
-  apk: 'package',
-  appimage: 'package',
-  ass: 'text',
-  avi: 'video',
-  avif: 'image',
-  bmp: 'image',
-  bz2: 'archive',
-  c: 'code',
-  cpp: 'code',
-  css: 'code',
-  csv: 'sheet',
-  deb: 'package',
-  dmg: 'package',
-  doc: 'text',
-  docx: 'text',
-  epub: 'text',
-  exe: 'package',
-  flac: 'audio',
-  flv: 'video',
-  gif: 'image',
-  go: 'code',
-  gz: 'archive',
-  h: 'code',
-  heic: 'image',
-  html: 'code',
-  iso: 'package',
-  java: 'code',
-  jpeg: 'image',
-  jpg: 'image',
-  js: 'code',
-  json: 'code',
-  jsx: 'code',
-  key: 'slides',
-  m4a: 'audio',
-  m4v: 'video',
-  md: 'text',
-  mkv: 'video',
-  mov: 'video',
-  mp3: 'audio',
-  mp4: 'video',
-  msi: 'package',
-  ogg: 'audio',
-  odp: 'slides',
-  ods: 'sheet',
-  opus: 'audio',
-  pdf: 'pdf',
-  pkg: 'package',
-  png: 'image',
-  ppt: 'slides',
-  pptx: 'slides',
-  py: 'code',
-  rar: 'archive',
-  rs: 'code',
-  rtf: 'text',
-  sh: 'code',
-  srt: 'text',
-  svg: 'image',
-  tar: 'archive',
-  ts: 'code',
-  tsx: 'code',
-  txt: 'text',
-  wav: 'audio',
-  webm: 'video',
-  webp: 'image',
-  wmv: 'video',
-  xls: 'sheet',
-  xlsx: 'sheet',
-  xz: 'archive',
-  yaml: 'code',
-  yml: 'code',
-  zip: 'archive',
-};
-
-function getFileKind(extension: string | null): FileKind {
-  if (!extension) {
-    return 'unknown';
-  }
-
-  return FILE_KIND_BY_EXTENSION[extension.toLowerCase()] ?? 'unknown';
 }
 
 function getFileKindClass(kind: FileKind): string {
@@ -549,16 +445,35 @@ function CloudIcon() {
   );
 }
 
+function DriveTableHead() {
+  return (
+    <div className={styles.tableHead}>
+      <span>名称</span>
+      <span>大小</span>
+      <span>修改时间</span>
+      <span />
+    </div>
+  );
+}
+
 function SkeletonRows() {
   return (
-    <div className={styles.skeletonList} aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div className={styles.skeletonRow} key={index}>
-          <span className={styles.skeletonIcon} />
-          <span className={styles.skeletonName} />
-          <span className={styles.skeletonMeta} />
-        </div>
-      ))}
+    <div aria-busy="true" className={styles.listView}>
+      <DriveTableHead />
+
+      <div className={styles.skeletonList} aria-hidden="true">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div className={styles.skeletonRow} key={index}>
+            <span className={styles.skeletonNameCell}>
+              <span className={styles.skeletonIcon} />
+              <span className={styles.skeletonName} />
+            </span>
+            <span className={styles.skeletonSize} />
+            <span className={styles.skeletonDate} />
+            <span className={styles.skeletonChevron} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -741,12 +656,7 @@ function DriveWorkspaceContent({
 
   return (
     <div className={styles.listView}>
-      <div className={styles.tableHead}>
-        <span>名称</span>
-        <span>大小</span>
-        <span>修改时间</span>
-        <span />
-      </div>
+      <DriveTableHead />
 
       <ul
         className={styles.fileList}
@@ -848,11 +758,6 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [activePlayback, setActivePlayback] = useState<ActivePlayback | null>(
-    null,
-  );
-  const [isStartingPlayback, setIsStartingPlayback] = useState(false);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [defaultDownloadDirectory, setDefaultDownloadDirectory] = useState<
     string | null
   >(null);
@@ -869,9 +774,12 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const offlineSubmittedRef = useRef(false);
   const activeDownloadIdRef = useRef<string | null>(null);
   const cancelRequestedRef = useRef(false);
-  const playbackRequestIdRef = useRef(0);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
+  const playback = useDrivePlayback({
+    connectionId: account?.connectionId ?? null,
+    entries,
+  });
 
   const currentBreadcrumb =
     breadcrumbs[breadcrumbs.length - 1] ?? ROOT_BREADCRUMB;
@@ -893,24 +801,6 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     getFileKind(selectedEntry.extension) === 'video'
       ? selectedEntry
       : null;
-  const videoEntries = useMemo(
-    () =>
-      entries
-        .filter(
-          (entry) =>
-            entry.kind === 'file' && getFileKind(entry.extension) === 'video',
-        )
-        .sort((left, right) =>
-          left.name.localeCompare(right.name, 'zh-CN', {
-            numeric: true,
-            sensitivity: 'base',
-          }),
-        ),
-    [entries],
-  );
-  const activePlaybackIndex = activePlayback
-    ? videoEntries.findIndex((entry) => entry.id === activePlayback.entry.id)
-    : -1;
   const selectedVideoProgress =
     account && selectedVideo
       ? getPlaybackProgress(account.connectionId, selectedVideo.id)
@@ -1543,129 +1433,6 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     }
   };
 
-  const stopPlaybackSession = async (sessionId: string) => {
-    try {
-      await window.desktop.drive.stopPlayback(sessionId);
-    } catch {
-      // The player is already closed; nothing else to clean up in the UI.
-    }
-  };
-
-  const handlePlayVideo = async (entry: DriveEntry) => {
-    if (!account || !entry.pickcode || isStartingPlayback) {
-      return;
-    }
-
-    const requestId = playbackRequestIdRef.current + 1;
-
-    playbackRequestIdRef.current = requestId;
-    setIsStartingPlayback(true);
-    setPlaybackError(null);
-
-    const previous = activePlayback;
-    const savedProgress = account
-      ? getPlaybackProgress(account.connectionId, entry.id)
-      : null;
-
-    try {
-      const result = await window.desktop.drive.startPlayback({
-        connectionId: account.connectionId,
-        pickcode: entry.pickcode,
-        fileName: entry.name,
-      });
-
-      if (requestId !== playbackRequestIdRef.current) {
-        if (result.ok) {
-          void stopPlaybackSession(result.data.sessionId);
-        }
-
-        return;
-      }
-
-      if (!result.ok) {
-        setPlaybackError(result.error.message);
-        return;
-      }
-
-      setActivePlayback({
-        entry,
-        playback: result.data,
-        resumePosition: savedProgress?.position ?? null,
-      });
-
-      if (previous && previous.playback.sessionId !== result.data.sessionId) {
-        void stopPlaybackSession(previous.playback.sessionId);
-      }
-    } catch (playFailure: unknown) {
-      if (requestId === playbackRequestIdRef.current) {
-        setPlaybackError(
-          toErrorMessage(playFailure, '无法开始播放视频，请稍后重试。'),
-        );
-      }
-    } finally {
-      if (requestId === playbackRequestIdRef.current) {
-        setIsStartingPlayback(false);
-      }
-    }
-  };
-
-  const handleClosePlayback = () => {
-    const playback = activePlayback;
-
-    playbackRequestIdRef.current += 1;
-    setIsStartingPlayback(false);
-    setActivePlayback(null);
-
-    if (playback) {
-      void stopPlaybackSession(playback.playback.sessionId);
-    }
-  };
-
-  const handleRetryPlayback = () => {
-    if (!activePlayback) {
-      return;
-    }
-
-    void handlePlayVideo(activePlayback.entry);
-  };
-
-  const handlePlaybackProgress = useCallback(
-    (position: number, duration: number) => {
-      if (!account || !activePlayback) {
-        return;
-      }
-
-      savePlaybackProgress(
-        account.connectionId,
-        activePlayback.entry.id,
-        position,
-        duration,
-      );
-    },
-    [account, activePlayback],
-  );
-
-  const handlePlaybackEnded = () => {
-    if (
-      activePlaybackIndex >= 0 &&
-      activePlaybackIndex + 1 < videoEntries.length
-    ) {
-      const nextEntry = videoEntries[activePlaybackIndex + 1];
-
-      if (nextEntry) {
-        void handlePlayVideo(nextEntry);
-      }
-    }
-  };
-
-  const handlePlaylistSelect = (entryId: string) => {
-    const target = videoEntries.find((entry) => entry.id === entryId);
-
-    if (target) {
-      void handlePlayVideo(target);
-    }
-  };
-
   useEffect(() => {
     showUploadErrorRef.current = showUploadError;
     dropUploadRef.current = (files) => {
@@ -1937,7 +1704,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     }
 
     if (getFileKind(entry.extension) === 'video') {
-      void handlePlayVideo(entry);
+      playback.play(entry);
     }
   };
 
@@ -2187,7 +1954,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                     disabled={
                       !canMutate ||
                       isUploading ||
-                      isStartingPlayback ||
+                      playback.isStarting ||
                       !selectedVideo.pickcode
                     }
                     title={
@@ -2197,11 +1964,11 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                     }
                     type="button"
                     onClick={() => {
-                      void handlePlayVideo(selectedVideo);
+                      playback.play(selectedVideo);
                     }}
                   >
                     <PlayIcon />
-                    {isStartingPlayback ? '准备播放…' : '播放'}
+                    {playback.isStarting ? '准备播放…' : '播放'}
                   </button>
                 )}
                 {selectedVideo && (
@@ -2456,34 +2223,31 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         />
       )}
 
-      {activePlayback && (
-        <DrivePlayerDialog
-          fileName={activePlayback.entry.name}
-          playback={activePlayback.playback}
-          resumePosition={activePlayback.resumePosition}
-          playlist={videoEntries.map((entry) => ({
-            id: entry.id,
-            name: entry.name,
-          }))}
-          playlistPosition={Math.max(0, activePlaybackIndex + 1)}
-          isSwitching={isStartingPlayback}
-          onSelectPlaylist={handlePlaylistSelect}
-          onClose={handleClosePlayback}
-          onRetry={handleRetryPlayback}
-          onProgress={handlePlaybackProgress}
-          onEnded={handlePlaybackEnded}
+      {playback.player && (
+        <VideoPlayerDialog
+          activeId={playback.player.activeId}
+          isLoading={playback.player.isSwitching}
+          kicker="115 / PLAYBACK"
+          playlist={playback.player.playlist}
+          resumePosition={playback.player.resumePosition}
+          source={playback.player.source}
+          subtitleTracks={playback.player.subtitleTracks}
+          title={playback.player.title}
+          onClose={playback.close}
+          onEnded={playback.handleEnded}
+          onProgress={playback.reportProgress}
+          onRetry={playback.retry}
+          onSelectPlaylist={playback.selectPlaylist}
         />
       )}
 
-      {playbackError && (
+      {playback.error && (
         <div className={styles.playbackError} role="alert">
-          <span>{playbackError}</span>
+          <span>{playback.error}</span>
           <button
             aria-label="关闭播放错误提示"
             type="button"
-            onClick={() => {
-              setPlaybackError(null);
-            }}
+            onClick={playback.dismissError}
           >
             ×
           </button>
