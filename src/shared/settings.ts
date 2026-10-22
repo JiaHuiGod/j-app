@@ -29,6 +29,9 @@ export interface AppSettings {
   readonly subtitles: {
     readonly directory: string | null;
   };
+  readonly localVideo: {
+    readonly directories: readonly string[];
+  };
 }
 
 export type ProxyTestTargetId = 'google' | 'github';

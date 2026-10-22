@@ -23,6 +23,7 @@ import type {
   DriveApi,
   SettingsApi,
 } from '@shared/ipc';
+import type { LocalVideoApi } from '@shared/local-video';
 import type { ProxySettings } from '@shared/settings';
 import App from './App';
 
@@ -406,6 +407,32 @@ beforeEach(() => {
     get: getAppearance,
     setTheme: setAppearanceTheme,
   };
+  const localVideo: LocalVideoApi = {
+    chooseFolders: vi
+      .fn<LocalVideoApi['chooseFolders']>()
+      .mockResolvedValue({ ok: true, data: null }),
+    loadLibraries: vi.fn<LocalVideoApi['loadLibraries']>().mockResolvedValue({
+      ok: true,
+      data: { libraries: [], errors: [] },
+    }),
+    rescan: vi.fn<LocalVideoApi['rescan']>().mockResolvedValue({
+      ok: true,
+      data: { libraries: [], errors: [] },
+    }),
+    removeFolder: vi.fn<LocalVideoApi['removeFolder']>().mockResolvedValue({
+      ok: true,
+      data: { libraries: [], errors: [] },
+    }),
+    getSubtitles: vi
+      .fn<LocalVideoApi['getSubtitles']>()
+      .mockResolvedValue({ ok: true, data: [] }),
+    cancelScan: vi
+      .fn<LocalVideoApi['cancelScan']>()
+      .mockResolvedValue(undefined),
+    onScanProgress: vi
+      .fn<LocalVideoApi['onScanProgress']>()
+      .mockReturnValue(() => {}),
+  };
   const windowControls: DesktopApi['windowControls'] = {
     minimize: vi.fn<() => void>(),
     toggleMaximize,
@@ -423,6 +450,7 @@ beforeEach(() => {
     appearance,
     connections,
     drive,
+    localVideo,
     restartApp,
   };
 

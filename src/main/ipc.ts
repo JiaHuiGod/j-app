@@ -10,6 +10,7 @@ import {
   removeSiteConnectionData,
 } from './connections/session-manager';
 import { registerDriveIpcHandlers } from './drive/ipc';
+import { registerLocalVideoIpcHandlers } from './local-video/ipc';
 import { testProxySettings } from './network/proxy';
 import {
   getDownloadDirectory,
@@ -117,6 +118,7 @@ export function registerIpcHandlers(): void {
     clearAllSiteConnectionData(),
   );
   registerDriveIpcHandlers();
+  registerLocalVideoIpcHandlers();
 
   ipcMain.on(IpcChannel.WindowMinimize, (event) => {
     getSenderWindow(event.sender)?.minimize();

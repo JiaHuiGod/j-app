@@ -31,6 +31,11 @@ import {
   type WindowControls,
 } from '@shared/ipc';
 import type { ProxySettings } from '@shared/settings';
+import type {
+  LocalVideoApi,
+  LocalVideoScanProgress,
+  LocalVideoSubtitleInput,
+} from '@shared/local-video';
 
 const windowControls = Object.freeze<WindowControls>({
   minimize: () => {
@@ -202,6 +207,41 @@ const drive = Object.freeze<DriveApi>({
   },
 });
 
+const localVideo: LocalVideoApi = {
+  chooseFolders: () => {
+    return ipcRenderer.invoke(IpcChannel.ChooseLocalVideoFolders);
+  },
+  loadLibraries: () => {
+    return ipcRenderer.invoke(IpcChannel.LoadLocalVideoLibraries);
+  },
+  rescan: () => {
+    return ipcRenderer.invoke(IpcChannel.RescanLocalVideoFolders);
+  },
+  removeFolder: (libraryId: string) => {
+    return ipcRenderer.invoke(IpcChannel.RemoveLocalVideoFolder, libraryId);
+  },
+  getSubtitles: (input: LocalVideoSubtitleInput) => {
+    return ipcRenderer.invoke(IpcChannel.GetLocalVideoSubtitles, input);
+  },
+  cancelScan: () => {
+    return ipcRenderer.invoke(IpcChannel.CancelLocalVideoScan);
+  },
+  onScanProgress: (listener: (progress: LocalVideoScanProgress) => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      progress: LocalVideoScanProgress,
+    ) => {
+      listener(progress);
+    };
+
+    ipcRenderer.on(IpcChannel.LocalVideoScanProgress, handler);
+
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.LocalVideoScanProgress, handler);
+    };
+  },
+};
+
 const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
@@ -210,6 +250,7 @@ const desktopApi = Object.freeze<DesktopApi>({
   appearance,
   connections,
   drive,
+  localVideo,
   restartApp: () => {
     ipcRenderer.send(IpcChannel.RestartApp);
   },

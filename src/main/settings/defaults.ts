@@ -24,6 +24,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   subtitles: {
     directory: null,
   },
+  localVideo: {
+    directories: [],
+  },
 };
 
 export function createDefaultAppSettings(): AppSettings {

@@ -13,4 +13,8 @@ describe('default app settings', () => {
   it('does not load local subtitles until a directory is configured', () => {
     expect(createDefaultAppSettings().subtitles.directory).toBeNull();
   });
+
+  it('does not load a local video library until a directory is configured', () => {
+    expect(createDefaultAppSettings().localVideo.directories).toEqual([]);
+  });
 });

@@ -255,6 +255,84 @@ export async function saveSubtitleDirectory(
   return directory;
 }
 
+function pathIdentity(value: string): string {
+  const resolved = path.resolve(value);
+
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+async function normalizeDirectories(input: unknown): Promise<string[]> {
+  if (!Array.isArray(input) || input.length > 50) {
+    throw new Error('本地视频目录列表格式不正确。');
+  }
+
+  const directories: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of input) {
+    let directory: string | null = null;
+
+    try {
+      directory = await normalizeDirectory(value, '本地视频目录');
+    } catch {
+      // Keep stale configured folders from blocking new selections.
+      continue;
+    }
+
+    if (!directory) {
+      continue;
+    }
+
+    const identity = pathIdentity(directory);
+
+    if (!seen.has(identity)) {
+      seen.add(identity);
+      directories.push(directory);
+    }
+  }
+
+  return directories;
+}
+
+export async function getLocalVideoDirectories(): Promise<readonly string[]> {
+  return (await loadSettings()).localVideo.directories;
+}
+
+export async function saveLocalVideoDirectories(
+  input: unknown,
+): Promise<string[]> {
+  const directories = await normalizeDirectories(input);
+
+  await updateSettings((current) => ({
+    ...current,
+    localVideo: {
+      ...current.localVideo,
+      directories,
+    },
+  }));
+
+  return directories;
+}
+
+export async function addLocalVideoDirectories(
+  input: readonly string[],
+): Promise<string[]> {
+  const current = await getLocalVideoDirectories();
+
+  return saveLocalVideoDirectories([...current, ...input]);
+}
+
+export async function removeLocalVideoDirectory(
+  directory: string,
+): Promise<string[]> {
+  const current = await getLocalVideoDirectories();
+  const identity = pathIdentity(directory);
+
+  return saveLocalVideoDirectories(
+    current.filter((item) => pathIdentity(item) !== identity),
+  );
+}
+
 export async function getSiteConnections(): Promise<readonly SiteConnection[]> {
   return (await loadSettings()).connections.sites;
 }

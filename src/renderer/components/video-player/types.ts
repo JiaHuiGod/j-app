@@ -4,6 +4,9 @@ export interface VideoPlayerSource {
   readonly url: string;
   readonly width: number | null;
   readonly height: number | null;
+  /** Defaults to HLS for 115 playback. Local files use a direct media URL. */
+  readonly kind?: 'hls' | 'file';
+  readonly posterUrl?: string;
 }
 
 export interface VideoPlaylistItem {

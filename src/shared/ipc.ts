@@ -29,6 +29,7 @@ import type {
   DriveSubtitle,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
+import type { LocalVideoApi } from './local-video';
 
 /**
  * Contract shared by the main, preload, and renderer processes.
@@ -78,6 +79,13 @@ export const IpcChannel = {
   GetDriveSubtitles: 'drive:subtitles',
   DriveUploadProgress: 'drive:upload-progress',
   DriveDownloadProgress: 'drive:file-download-progress',
+  ChooseLocalVideoFolders: 'local-video:choose-folders',
+  LoadLocalVideoLibraries: 'local-video:load-libraries',
+  RescanLocalVideoFolders: 'local-video:rescan',
+  RemoveLocalVideoFolder: 'local-video:remove-folder',
+  GetLocalVideoSubtitles: 'local-video:subtitles',
+  CancelLocalVideoScan: 'local-video:cancel-scan',
+  LocalVideoScanProgress: 'local-video:scan-progress',
 } as const;
 
 export interface AppInfo {
@@ -184,5 +192,6 @@ export interface DesktopApi {
   readonly appearance: AppearanceApi;
   readonly connections: ConnectionsApi;
   readonly drive: DriveApi;
+  readonly localVideo: LocalVideoApi;
   readonly restartApp: () => void;
 }

@@ -9,11 +9,14 @@ import { DrivePage } from './pages/DrivePage';
 import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DrivePlaybackProvider } from './features/drive/playback/DrivePlaybackProvider';
+import { LocalVideoPage } from './features/local-video/LocalVideoPage';
+import { LocalVideoProvider } from './features/local-video/LocalVideoProvider';
 import { GlobalVideoPlayerProvider } from './playback/GlobalVideoPlayerProvider';
 
 function App() {
   const [activePage, setActivePage] = useState<AppPage>('overview');
   const [hasVisitedDrive, setHasVisitedDrive] = useState(false);
+  const [hasVisitedLocal, setHasVisitedLocal] = useState(false);
   const [isProxyDialogOpen, setIsProxyDialogOpen] = useState(false);
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -43,6 +46,10 @@ function App() {
 
     if (page === 'drive') {
       setHasVisitedDrive(true);
+    }
+
+    if (page === 'local') {
+      setHasVisitedLocal(true);
     }
 
     if (appShellRef.current) {
@@ -88,6 +95,17 @@ function App() {
                   }}
                 />
               </div>
+            )}
+
+            {hasVisitedLocal && (
+              <LocalVideoProvider>
+                <div
+                  className="page-slot page-slot-fluid"
+                  hidden={activePage !== 'local'}
+                >
+                  <LocalVideoPage />
+                </div>
+              </LocalVideoProvider>
             )}
 
             {activePage === 'settings' && (

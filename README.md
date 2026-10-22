@@ -2,7 +2,7 @@
 
 一个面向实际开发起步的 Electron 桌面应用工程：**Electron Forge + Vite + React 19 + TypeScript**。
 
-项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理，以及 115 网盘浏览、搜索、文件拖拽/选择上传与文件管理。
+项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理、115 网盘浏览与文件管理，以及本地视频库和通用播放器。
 
 ![J App 运行预览](docs/preview.png)
 
@@ -74,6 +74,7 @@ j-app/
 │  ├─ clear-all-dialog.png      # 清理全部站点确认弹窗
 │  ├─ cookie-sessions.md        # 站点 Cookie 会话功能文档
 │  ├─ drive-115.md              # 115 网盘浏览与文件操作文档
+│  ├─ local-video.md            # 本地视频库、封面匹配与协议文档
 │  ├─ themes.md                 # 主题与外观功能文档
 │  ├─ proxy-dialog.png          # 网络代理弹窗
 │  ├─ proxy-saved.png           # 开启代理后的重启提示
@@ -115,6 +116,12 @@ j-app/
 │  │  │  ├─ subtitles.ts        # 本地字幕目录读取与解码
 │  │  │  ├─ subtitle-matcher.ts # 视频与字幕文件名匹配
 │  │  │  └─ upload.ts           # 上传初始化、OSS 流式上传与进度
+│  │  ├─ local-video/
+│  │  │  ├─ ipc.ts               # 文件夹选择、扫描与进度 IPC
+│  │  │  ├─ protocol.ts          # japp-local 视频/封面协议与 Range
+│  │  │  ├─ registry.ts          # 视频/封面 ID 到路径的注册表
+│  │  │  ├─ scanner.ts           # 递归扫描、视频识别与封面匹配
+│  │  │  └─ subtitles.ts         # 115 同款模糊匹配、设置字幕目录与同目录读取
 │  │  ├─ network/
 │  │  │  └─ proxy.ts            # 启动时应用代理、代理连接测试
 │  │  ├─ settings/
@@ -130,20 +137,26 @@ j-app/
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
 │  │  ├─ features/
-│  │  │  └─ drive/              # 115 网盘功能域
-│  │  │     ├─ components/      # 网盘专属弹窗、上传/下载/离线面板
-│  │  │     │  ├─ DriveActionDialog.tsx
-│  │  │     │  ├─ DriveMoveDialog.tsx
-│  │  │     │  ├─ DriveFolderPickerDialog.tsx
-│  │  │     │  ├─ DriveUploadPanel.tsx
-│  │  │     │  ├─ DriveDownloadPanel.tsx
-│  │  │     │  ├─ DriveOfflineDialog.tsx
-│  │  │     │  └─ *.module.css  # 对应弹窗与面板样式
-│  │  │     ├─ lib/
-│  │  │     │  └─ drive-playlist.ts # 当前目录视频过滤、排序与短标题
-│  │  │     └─ playback/
-│  │  │        ├─ DrivePlaybackProvider.tsx # 115 播放数据接入
-│  │  │        └─ useDrivePlayback.ts # 会话、竞态、进度与自动连播
+│  │  │  ├─ drive/              # 115 网盘功能域
+│  │  │  │  ├─ components/      # 网盘专属弹窗、上传/下载/离线面板
+│  │  │  │  │  ├─ DriveActionDialog.tsx
+│  │  │  │  │  ├─ DriveMoveDialog.tsx
+│  │  │  │  │  ├─ DriveFolderPickerDialog.tsx
+│  │  │  │  │  ├─ DriveUploadPanel.tsx
+│  │  │  │  │  ├─ DriveDownloadPanel.tsx
+│  │  │  │  │  ├─ DriveOfflineDialog.tsx
+│  │  │  │  │  └─ *.module.css  # 对应弹窗与面板样式
+│  │  │  │  ├─ lib/
+│  │  │  │  │  └─ drive-playlist.ts # 当前目录视频过滤、排序与短标题
+│  │  │  │  └─ playback/
+│  │  │  │     ├─ DrivePlaybackProvider.tsx # 115 播放数据接入
+│  │  │  │     └─ useDrivePlayback.ts # 会话、竞态、进度与自动连播
+│  │  │  └─ local-video/        # 本地视频库功能域
+│  │  │     ├─ LocalVideoPage.tsx # 多文件夹、网格/列表与搜索排序
+│  │  │     ├─ LocalVideoPage.module.css
+│  │  │     ├─ LocalVideoProvider.tsx # 多库扫描、字幕与本地播放器请求
+│  │  │     ├─ LocalVideoPage.test.tsx
+│  │  │     └─ local-video-preferences.ts # 视图模式与本地进度
 │  │  ├─ components/
 │  │  │  ├─ video-player/       # 通用 HLS 播放器、工具栏、播放列表抽屉
 │  │  │  │  ├─ VideoPlayerDialog.tsx
@@ -200,6 +213,7 @@ j-app/
 │  │  ├─ connections.ts         # 站点连接与 Cookie 摘要类型
 │  │  ├─ drive.ts               # 网盘账号、目录、文件操作与上传契约
 │  │  ├─ ipc.ts                 # 通道名、AppInfo、DesktopApi
+│  │  ├─ local-video.ts         # 本地视频库、封面与扫描 API 契约
 │  │  ├─ settings.ts            # 应用设置与代理数据类型
 │  │  └─ window.d.ts            # window.desktop 的全局类型
 │  └─ types/
@@ -217,7 +231,7 @@ j-app/
 
 `@shared/*` 别名在 TypeScript、三个 Vite 配置和 Vitest 中保持一致，用来引用跨进程契约。进程内部代码使用相对路径，跨边界代码使用别名，避免目录移动时产生大量路径修改。
 
-渲染层按功能域组织：115 专属组件、目录视频排序和播放适配集中在 `src/renderer/features/drive/`；通用播放器 `components/video-player/` 和全局宿主 `playback/GlobalVideoPlayerProvider` 不依赖 115 契约。页面仍保留在 `pages/`，作为路由层组合 feature。
+渲染层按功能域组织：115 专属组件、目录视频排序和播放适配集中在 `src/renderer/features/drive/`；本地视频库、多文件夹、网格/列表和本地播放请求集中在 `src/renderer/features/local-video/`；通用播放器 `components/video-player/` 和全局宿主 `playback/GlobalVideoPlayerProvider` 不依赖具体业务契约。页面仍保留在 `pages/` 或 feature 内，作为路由层组合 feature。
 
 ## 样式组织
 
@@ -278,11 +292,14 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 - **概览**：现有工程自检与运行环境
 - **网盘**：115 网盘浏览、当前目录搜索、文件选择/拖拽上传、新建文件夹、重命名、Ctrl 多选、批量移动与删除、离线任务、文件/视频下载与在线播放
+- **本地**：选择一个或多个文件夹扫描本地视频，网格显示 poster、列表显示 thumb 横向卡片，按 115 同款模糊规则挂载设置字幕目录或同目录字幕并使用同一全局播放器播放
 - **设置**：应用主题外观、默认下载目录、本地字幕目录与站点账号管理，网络代理仍保持从标题栏独立打开，主题也可从标题栏“代理”右侧快速切换
 
-导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换到网盘页时会保留上次目录、滚动位置、选中项和搜索状态。
+导航配置在 [`src/renderer/navigation.ts`](src/renderer/navigation.ts)。页面切换由 `App.tsx` 管理，没有引入路由依赖；切换到网盘页或本地页时会保留各自的目录、选中项和搜索状态。
 
 网盘页通过已保存的 115 站点连接读取目录，不向渲染层暴露 Cookie。当前支持文件选择/拖拽上传、新建文件夹、重命名、Ctrl 多选、批量移动和删除、离线任务提交与查看、文件/视频下载与在线播放；视频按文件保存播放进度并支持续播和当前目录视频自动连播；播放器提供自定义工具栏（播放、进度、音量、倍速、字幕、全屏）和可跨页面恢复或关闭的最小化悬浮按钮，悬浮条左侧可直接暂停/继续，播放列表滚动条使用低对比度细样式，右侧默认折叠播放列表显示全部视频和当前项；字幕可从设置页配置的本地目录自动匹配；文件默认下载到设置页配置的目录，保存对话框中仍可临时改位置。暂不支持拖拽文件夹。实现细节见 [115 网盘文档](docs/drive-115.md)。
+
+本地视频页通过系统目录选择器扫描一个或多个文件夹，使用 `japp-local://` 协议提供带 Range 的视频流和图片，不把 `file://` 路径交给渲染层。网格视图使用 379×535 poster，列表视图使用 800×535 thumb 的横向卡片网格，并按各自比例以 `object-fit: cover` 展示；切换视图时封面变化但卡片不变形。文件夹可从页面顶部直接移除；播放时按 115 同款模糊规则，从设置字幕目录和视频同目录挂载 SRT/VTT/ASS/SSA 字幕；视图模式和本地续播进度保存在 localStorage。实现细节见 [本地视频文档](docs/local-video.md)。
 
 设置页面：
 

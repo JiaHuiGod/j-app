@@ -3,6 +3,7 @@ import started from 'electron-squirrel-startup';
 import { applyThemePreference } from './appearance/theme';
 import { cleanupOrphanSitePartitions } from './connections/partition-cleanup';
 import { registerIpcHandlers } from './ipc';
+import { registerLocalVideoProtocol } from './local-video/protocol';
 import { applyProxySettings } from './network/proxy';
 import { installSecurityPolicies } from './security';
 import { loadSettings } from './settings/store';
@@ -46,6 +47,7 @@ if (started) {
       }
 
       registerIpcHandlers();
+      registerLocalVideoProtocol();
       createMainWindow();
 
       app.on('activate', () => {

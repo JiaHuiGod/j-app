@@ -72,6 +72,9 @@ describe('application settings migration', () => {
       subtitles: {
         directory: null,
       },
+      localVideo: {
+        directories: [],
+      },
     });
   });
 
@@ -114,6 +117,26 @@ describe('application settings migration', () => {
     });
 
     expect(settings.appearance.theme).toBe('dark');
+  });
+
+  it('migrates a legacy single local video directory', () => {
+    const settings = parseAppSettings({
+      schemaVersion: 3,
+      network: {
+        proxy: disabledProxy,
+      },
+      connections: {
+        sites: [],
+      },
+      appearance: {
+        theme: 'light',
+      },
+      localVideo: {
+        directory: 'D:\\Videos',
+      },
+    });
+
+    expect(settings.localVideo.directories).toEqual(['D:\\Videos']);
   });
 
   it('rejects unsupported settings versions', () => {

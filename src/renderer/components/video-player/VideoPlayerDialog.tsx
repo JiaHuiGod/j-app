@@ -442,7 +442,11 @@ export function VideoPlayerDialog({
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
-    if (Hls.isSupported()) {
+    if (source.kind === 'file') {
+      video.src = source.url;
+      video.load();
+      void video.play().catch(() => undefined);
+    } else if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -479,7 +483,7 @@ export function VideoPlayerDialog({
       video.removeAttribute('src');
       video.load();
     };
-  }, [resumePosition, source.url]);
+  }, [resumePosition, source.kind, source.url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -876,11 +880,16 @@ export function VideoPlayerDialog({
                 ref={videoRef}
                 className={styles.video}
                 playsInline
+                poster={source.posterUrl}
                 style={{ aspectRatio }}
                 width={source.width ?? undefined}
                 height={source.height ?? undefined}
                 onError={() => {
-                  setRuntimeError('视频加载失败，请重新获取播放地址。');
+                  setRuntimeError(
+                    source.kind === 'file'
+                      ? '本地视频无法播放，可能是编码不受支持。'
+                      : '视频加载失败，请重新获取播放地址。',
+                  );
                 }}
               >
                 <track kind="captions" label="无字幕" />

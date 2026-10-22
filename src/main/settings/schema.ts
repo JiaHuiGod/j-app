@@ -139,6 +139,31 @@ const subtitlesSchema = z
   })
   .default({ directory: null });
 
+const localVideoSchema = z
+  .preprocess(
+    (value) => {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        !('directories' in value) &&
+        'directory' in value
+      ) {
+        const legacy = (value as Record<string, unknown>).directory;
+
+        return {
+          directories:
+            typeof legacy === 'string' && legacy.trim() ? [legacy] : [],
+        };
+      }
+
+      return value;
+    },
+    z.object({
+      directories: z.array(z.string().trim().max(4096)).max(50),
+    }),
+  )
+  .default({ directories: [] });
+
 const appSettingsSchema = z.object({
   schemaVersion: z.literal(3),
   network: z.object({
@@ -148,6 +173,7 @@ const appSettingsSchema = z.object({
   appearance: appearanceSchema,
   downloads: downloadsSchema,
   subtitles: subtitlesSchema,
+  localVideo: localVideoSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -201,6 +227,9 @@ export function parseAppSettings(input: unknown): AppSettings {
       subtitles: {
         directory: null,
       },
+      localVideo: {
+        directories: [],
+      },
     };
   }
 
@@ -228,6 +257,9 @@ export function parseAppSettings(input: unknown): AppSettings {
       },
       subtitles: {
         directory: null,
+      },
+      localVideo: {
+        directories: [],
       },
     };
   }

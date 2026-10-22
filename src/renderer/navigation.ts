@@ -1,4 +1,4 @@
-export type AppPage = 'overview' | 'drive' | 'settings';
+export type AppPage = 'overview' | 'drive' | 'local' | 'settings';
 
 export interface NavigationItem {
   readonly id: AppPage;
@@ -11,5 +11,6 @@ export interface NavigationItem {
 export const NAVIGATION_ITEMS = [
   { id: 'overview', label: '概览' },
   { id: 'drive', label: '网盘' },
+  { id: 'local', label: '本地' },
   { id: 'settings', label: '设置' },
 ] as const satisfies readonly NavigationItem[];
