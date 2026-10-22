@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import type { DriveBreadcrumb, DriveEntry } from '@shared/drive';
-import ui from '../styles/ui.module.css';
+import ui from '../../../styles/ui.module.css';
 import styles from './DriveDialogs.module.css';
 
 interface DriveMoveDialogProps {

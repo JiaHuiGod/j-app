@@ -23,12 +23,12 @@ import {
   formatPlaybackPosition,
   getPlaybackProgress,
 } from '../lib/playback-progress';
-import { useDrivePlaybackController } from '../playback/DrivePlaybackProvider';
-import { DriveActionDialog } from '../components/DriveActionDialog';
-import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
-import { DriveMoveDialog } from '../components/DriveMoveDialog';
-import { DriveOfflineDialog } from '../components/DriveOfflineDialog';
-import { DriveUploadPanel } from '../components/DriveUploadPanel';
+import { useDrivePlaybackController } from '../features/drive/playback/DrivePlaybackProvider';
+import { DriveActionDialog } from '../features/drive/components/DriveActionDialog';
+import { DriveDownloadPanel } from '../features/drive/components/DriveDownloadPanel';
+import { DriveMoveDialog } from '../features/drive/components/DriveMoveDialog';
+import { DriveOfflineDialog } from '../features/drive/components/DriveOfflineDialog';
+import { DriveUploadPanel } from '../features/drive/components/DriveUploadPanel';
 import ui from '../styles/ui.module.css';
 import styles from './DrivePage.module.css';
 

@@ -8,13 +8,13 @@ import type {
   VideoPlaylistItem,
   VideoPlayerSource,
   VideoSubtitleTrack,
-} from '../components/video-player/types';
+} from '../../../components/video-player/types';
 import { compactDriveFileName, listVideoEntries } from '../lib/drive-playlist';
-import { toErrorMessage } from '../lib/errors';
+import { toErrorMessage } from '../../../lib/errors';
 import {
   getPlaybackProgress,
   savePlaybackProgress,
-} from '../lib/playback-progress';
+} from '../../../lib/playback-progress';
 
 interface UseDrivePlaybackOptions {
   readonly connectionId: string | null;

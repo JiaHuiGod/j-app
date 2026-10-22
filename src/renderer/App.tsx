@@ -8,7 +8,7 @@ import type { AppPage } from './navigation';
 import { DrivePage } from './pages/DrivePage';
 import { OverviewPage } from './pages/OverviewPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { DrivePlaybackProvider } from './playback/DrivePlaybackProvider';
+import { DrivePlaybackProvider } from './features/drive/playback/DrivePlaybackProvider';
 import { GlobalVideoPlayerProvider } from './playback/GlobalVideoPlayerProvider';
 
 function App() {

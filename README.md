@@ -101,12 +101,20 @@ j-app/
 │  │  │  ├─ persist-cookies.ts   # 将 115 会话 Cookie 提升为持久 Cookie
 │  │  │  └─ site-profile.ts      # 站点会话的桌面 Chrome UA 兼容配置
 │  │  ├─ drive/
-│  │  │  ├─ accounts.ts          # 识别可用的 115 站点连接
-│  │  │  ├─ detection.ts         # 115 登录地址识别
-│  │  │  ├─ ipc.ts               # 网盘 IPC 结果封装
-│  │  │  ├─ mapper.ts            # 115 文件响应归一化
-│  │  │  ├─ mapper.test.ts       # 115 数据映射测试
-│  │  │  └─ 115.ts               # 目录列表、当前目录搜索与登录检测
+│  │  │  ├─ 115.ts              # 目录列表、搜索、文件操作与登录检测
+│  │  │  ├─ 115-http.ts         # 115 HTTP 请求、Cookie 与错误封装
+│  │  │  ├─ accounts.ts         # 识别可用的 115 站点连接
+│  │  │  ├─ actions.ts          # 新建、重命名、移动、删除等文件操作
+│  │  │  ├─ detection.ts        # 115 登录地址识别
+│  │  │  ├─ download.ts         # 视频下载、取消与保存
+│  │  │  ├─ ipc.ts              # 网盘 IPC 结果封装
+│  │  │  ├─ mapper.ts           # 115 文件响应归一化
+│  │  │  ├─ offline.ts          # 离线任务提交与状态查询
+│  │  │  ├─ offline-mapper.ts   # 离线任务响应归一化
+│  │  │  ├─ playback.ts         # 视频播放地址与一次性 Cookie
+│  │  │  ├─ subtitles.ts        # 本地字幕目录读取与解码
+│  │  │  ├─ subtitle-matcher.ts # 视频与字幕文件名匹配
+│  │  │  └─ upload.ts           # 上传初始化、OSS 流式上传与进度
 │  │  ├─ network/
 │  │  │  └─ proxy.ts            # 启动时应用代理、代理连接测试
 │  │  ├─ settings/
@@ -121,29 +129,61 @@ j-app/
 │  ├─ preload/                  # 预加载：受控 API 边界
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
+│  │  ├─ features/
+│  │  │  └─ drive/              # 115 网盘功能域
+│  │  │     ├─ components/      # 网盘专属弹窗、上传/下载/离线面板
+│  │  │     │  ├─ DriveActionDialog.tsx
+│  │  │     │  ├─ DriveMoveDialog.tsx
+│  │  │     │  ├─ DriveFolderPickerDialog.tsx
+│  │  │     │  ├─ DriveUploadPanel.tsx
+│  │  │     │  ├─ DriveDownloadPanel.tsx
+│  │  │     │  ├─ DriveOfflineDialog.tsx
+│  │  │     │  └─ *.module.css  # 对应弹窗与面板样式
+│  │  │     ├─ lib/
+│  │  │     │  └─ drive-playlist.ts # 当前目录视频过滤、排序与短标题
+│  │  │     └─ playback/
+│  │  │        ├─ DrivePlaybackProvider.tsx # 115 播放数据接入
+│  │  │        └─ useDrivePlayback.ts # 会话、竞态、进度与自动连播
 │  │  ├─ components/
+│  │  │  ├─ video-player/       # 通用 HLS 播放器、工具栏、播放列表抽屉
+│  │  │  │  ├─ VideoPlayerDialog.tsx
+│  │  │  │  ├─ VideoPlayerToolbar.tsx
+│  │  │  │  ├─ VideoPlayerDrawer.tsx
+│  │  │  │  ├─ useVideoMediaState.ts
+│  │  │  │  ├─ PlayerIcons.tsx
+│  │  │  │  ├─ types.ts
+│  │  │  │  ├─ *.module.css     # 播放器、工具栏、抽屉与自适应样式
+│  │  │  │  └─ index.ts
 │  │  │  ├─ AddSiteDialog.tsx    # 添加站点或仅保存预设
 │  │  │  ├─ AppMark.tsx          # 与桌面图标一致的内联 SVG 标志
 │  │  │  ├─ ClearAllSitesDialog.tsx # 清理全部站点确认弹窗
+│  │  │  ├─ DownloadSettings.tsx # 下载目录与字幕目录设置
 │  │  │  ├─ GlobeIcon.tsx        # 网络代理与站点图标
 │  │  │  ├─ ProxyDialog.tsx      # 代理配置、测试与重启提示弹窗
-│  │  │  ├─ ProxyDialog.module.css # 代理弹窗样式
-│  │  │  ├─ SiteDialogs.module.css # 添加站点与清理全部弹窗共享样式
+│  │  │  ├─ SiteDialogs.module.css # 站点弹窗共享样式
+│  │  │  ├─ ThemeIcon.tsx        # 主题菜单图标
 │  │  │  ├─ ThemeSettings.tsx    # 三档主题选择与预览
-│  │  │  ├─ ThemeSettings.module.css # 主题选择器样式
 │  │  │  ├─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
-│  │  │  └─ TitleBar.module.css  # 标题栏样式、暗色与响应式规则
+│  │  │  └─ *.module.css         # 组件样式
+│  │  ├─ playback/              # 与业务无关的全局播放宿主
+│  │  │  ├─ GlobalVideoPlayerProvider.tsx
+│  │  │  ├─ GlobalVideoPlayerProvider.module.css
+│  │  │  └─ GlobalVideoPlayerProvider.test.tsx
 │  │  ├─ hooks/
+│  │  │  ├─ useAppearance.ts    # 主题加载、保存与系统主题同步
 │  │  │  └─ useAppInfo.ts       # IPC 数据加载与重试
 │  │  ├─ lib/
-│  │  │  └─ errors.ts           # IPC 错误消息整理
+│  │  │  ├─ errors.ts           # IPC 错误消息整理
+│  │  │  ├─ file-kind.ts        # 扩展名到文件类型映射
+│  │  │  ├─ playback-progress.ts # 播放进度读写与格式化
+│  │  │  ├─ player-preferences.ts # 音量/静音记忆与会话级倍速
+│  │  │  ├─ subtitles.ts        # SRT/VTT/ASS/SSA 解析
+│  │  │  └─ theme.ts            # 主题偏好解析与标题栏状态
 │  │  ├─ pages/
-│  │  │  ├─ OverviewPage.tsx     # 概览页
-│  │  │  ├─ OverviewPage.module.css # 概览布局与运行环境
-│  │  │  ├─ DrivePage.tsx        # 115 网盘浏览、搜索与文件操作
-│  │  │  ├─ DrivePage.module.css # 网盘页头、搜索与文件列表
-│  │  │  ├─ SettingsPage.tsx     # 外观、账号、资源提示与数据清理
-│  │  │  └─ SettingsPage.module.css # 设置页与站点连接
+│  │  │  ├─ OverviewPage.tsx    # 概览页
+│  │  │  ├─ DrivePage.tsx       # 115 网盘页面交互与状态
+│  │  │  ├─ SettingsPage.tsx    # 外观、账号、下载与数据清理
+│  │  │  └─ *.module.css        # 页面样式
 │  │  ├─ styles/
 │  │  │  ├─ global.css          # 全局样式入口
 │  │  │  ├─ tokens.css          # 设计 Token、亮/暗变量
@@ -151,8 +191,8 @@ j-app/
 │  │  │  ├─ page.module.css     # 页面共享布局与排版
 │  │  │  ├─ ui.module.css       # 共享按钮、加载指示器与提示框
 │  │  │  └─ reduced-motion.css  # 减少动画偏好
-│  │  ├─ App.test.tsx           # 渲染层测试
-│  │  ├─ App.tsx                # 页面切换与全局状态
+│  │  ├─ App.test.tsx           # 渲染层集成测试
+│  │  ├─ App.tsx                # 页面切换、标题栏与全局 Provider
 │  │  ├─ navigation.ts          # 主导航配置
 │  │  └─ main.tsx               # React 入口
 │  ├─ shared/                   # 三端共享的纯类型与契约
@@ -176,6 +216,8 @@ j-app/
 ```
 
 `@shared/*` 别名在 TypeScript、三个 Vite 配置和 Vitest 中保持一致，用来引用跨进程契约。进程内部代码使用相对路径，跨边界代码使用别名，避免目录移动时产生大量路径修改。
+
+渲染层按功能域组织：115 专属组件、目录视频排序和播放适配集中在 `src/renderer/features/drive/`；通用播放器 `components/video-player/` 和全局宿主 `playback/GlobalVideoPlayerProvider` 不依赖 115 契约。页面仍保留在 `pages/`，作为路由层组合 feature。
 
 ## 样式组织
 

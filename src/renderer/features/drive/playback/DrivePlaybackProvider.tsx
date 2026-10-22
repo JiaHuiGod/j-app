@@ -8,9 +8,9 @@ import {
   type ReactNode,
 } from 'react';
 import type { DriveEntry } from '@shared/drive';
-import { useDrivePlayback } from '../hooks/useDrivePlayback';
+import { useDrivePlayback } from './useDrivePlayback';
 import { compactDriveFileName } from '../lib/drive-playlist';
-import { useGlobalVideoPlayer } from './GlobalVideoPlayerProvider';
+import { useGlobalVideoPlayer } from '../../../playback/GlobalVideoPlayerProvider';
 import styles from './DrivePlaybackProvider.module.css';
 
 interface PlaylistContext {

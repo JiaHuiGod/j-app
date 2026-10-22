@@ -55,43 +55,43 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 
 关键文件：
 
-| 文件                                                          | 职责                                     |
-| ------------------------------------------------------------- | ---------------------------------------- |
-| `src/shared/drive.ts`                                         | 网盘账号、目录、文件操作和上传契约       |
-| `src/main/drive/accounts.ts`                                  | 将 115 站点连接映射为网盘账号            |
-| `src/main/drive/detection.ts`                                 | 识别 115 登录地址                        |
-| `src/main/drive/115.ts`                                       | 115 登录探针、目录列表、当前目录搜索     |
-| `src/main/drive/115-http.ts`                                  | 显式 Cookie 请求、JSON 响应与错误映射    |
-| `src/main/drive/actions.ts`                                   | 新建、重命名、移动、删除                 |
-| `src/main/drive/offline.ts`                                   | 离线任务签名、提交和任务列表             |
-| `src/main/drive/offline-mapper.ts`                            | 离线任务状态、进度和分页归一化           |
-| `src/main/drive/download.ts`                                  | 视频下载地址、保存对话框和流式下载       |
-| `src/main/drive/playback.ts`                                  | 播放会话、本机代理与 m3u8 重写           |
-| `src/main/drive/subtitles.ts`                                 | 本地字幕目录读取与内容解码               |
-| `src/main/drive/subtitle-matcher.ts`                          | 视频与字幕文件名匹配                     |
-| `src/main/drive/upload.ts`                                    | 115 上传初始化、OSS 流式上传与进度       |
-| `src/main/drive/mapper.ts`                                    | 115 响应归一化、HTML 标签清理、分页状态  |
-| `src/main/drive/ipc.ts`                                       | 网盘 IPC 处理器                          |
-| `src/renderer/pages/DrivePage.tsx`                            | 网盘页交互与状态                         |
-| `src/renderer/pages/DrivePage.module.css`                     | 紧凑页头、搜索、列表和响应式样式         |
-| `src/renderer/playback/GlobalVideoPlayerProvider.tsx`         | 通用播放宿主、最小化悬浮按钮与跨页面恢复 |
-| `src/renderer/playback/DrivePlaybackProvider.tsx`             | 115 播放数据接入与全局播放错误提示       |
-| `src/renderer/hooks/useDrivePlayback.ts`                      | 115 播放适配：会话、竞态、进度和连播     |
-| `src/renderer/components/video-player/`                       | 通用 HLS 播放器、工具栏、播放列表抽屉    |
-| `src/renderer/components/video-player/VideoPlayerToolbar.tsx` | 播放、进度、音量、倍速、字幕和全屏控件   |
-| `src/renderer/components/video-player/useVideoMediaState.ts`  | 媒体状态同步与播放控制                   |
-| `src/renderer/lib/player-preferences.ts`                      | 音量/静音记忆和会话级倍速                |
-| `src/renderer/lib/drive-playlist.ts`                          | 当前目录视频过滤、自然排序与短标题       |
-| `src/renderer/lib/file-kind.ts`                               | 扩展名到文件类型的统一映射               |
-| `src/renderer/components/DriveActionDialog.tsx`               | 新建、重命名、删除确认对话框             |
-| `src/renderer/components/DriveMoveDialog.tsx`                 | 目标目录选择与移动                       |
-| `src/renderer/components/DriveFolderPickerDialog.tsx`         | 离线任务保存目录选择                     |
-| `src/renderer/components/DriveUploadPanel.tsx`                | 上传进度面板                             |
-| `src/renderer/components/DriveOfflineDialog.tsx`              | 离线任务提交与列表                       |
-| `src/renderer/components/DriveDownloadPanel.tsx`              | 视频下载进度与结果                       |
-| `src/renderer/lib/playback-progress.ts`                       | 按文件和站点保存播放进度                 |
-| `src/renderer/lib/subtitles.ts`                               | SRT、VTT、ASS、SSA 解析                  |
-| `src/renderer/components/DownloadSettings.tsx`                | 设置页下载和字幕目录                     |
+| 文件                                                                 | 职责                                     |
+| -------------------------------------------------------------------- | ---------------------------------------- |
+| `src/shared/drive.ts`                                                | 网盘账号、目录、文件操作和上传契约       |
+| `src/main/drive/accounts.ts`                                         | 将 115 站点连接映射为网盘账号            |
+| `src/main/drive/detection.ts`                                        | 识别 115 登录地址                        |
+| `src/main/drive/115.ts`                                              | 115 登录探针、目录列表、当前目录搜索     |
+| `src/main/drive/115-http.ts`                                         | 显式 Cookie 请求、JSON 响应与错误映射    |
+| `src/main/drive/actions.ts`                                          | 新建、重命名、移动、删除                 |
+| `src/main/drive/offline.ts`                                          | 离线任务签名、提交和任务列表             |
+| `src/main/drive/offline-mapper.ts`                                   | 离线任务状态、进度和分页归一化           |
+| `src/main/drive/download.ts`                                         | 视频下载地址、保存对话框和流式下载       |
+| `src/main/drive/playback.ts`                                         | 播放会话、本机代理与 m3u8 重写           |
+| `src/main/drive/subtitles.ts`                                        | 本地字幕目录读取与内容解码               |
+| `src/main/drive/subtitle-matcher.ts`                                 | 视频与字幕文件名匹配                     |
+| `src/main/drive/upload.ts`                                           | 115 上传初始化、OSS 流式上传与进度       |
+| `src/main/drive/mapper.ts`                                           | 115 响应归一化、HTML 标签清理、分页状态  |
+| `src/main/drive/ipc.ts`                                              | 网盘 IPC 处理器                          |
+| `src/renderer/pages/DrivePage.tsx`                                   | 网盘页交互与状态                         |
+| `src/renderer/pages/DrivePage.module.css`                            | 紧凑页头、搜索、列表和响应式样式         |
+| `src/renderer/playback/GlobalVideoPlayerProvider.tsx`                | 通用播放宿主、最小化悬浮按钮与跨页面恢复 |
+| `src/renderer/features/drive/playback/DrivePlaybackProvider.tsx`     | 115 播放数据接入与全局播放错误提示       |
+| `src/renderer/features/drive/playback/useDrivePlayback.ts`           | 115 播放适配：会话、竞态、进度和连播     |
+| `src/renderer/components/video-player/`                              | 通用 HLS 播放器、工具栏、播放列表抽屉    |
+| `src/renderer/components/video-player/VideoPlayerToolbar.tsx`        | 播放、进度、音量、倍速、字幕和全屏控件   |
+| `src/renderer/components/video-player/useVideoMediaState.ts`         | 媒体状态同步与播放控制                   |
+| `src/renderer/lib/player-preferences.ts`                             | 音量/静音记忆和会话级倍速                |
+| `src/renderer/features/drive/lib/drive-playlist.ts`                  | 当前目录视频过滤、自然排序与短标题       |
+| `src/renderer/lib/file-kind.ts`                                      | 扩展名到文件类型的统一映射               |
+| `src/renderer/features/drive/components/DriveActionDialog.tsx`       | 新建、重命名、删除确认对话框             |
+| `src/renderer/features/drive/components/DriveMoveDialog.tsx`         | 目标目录选择与移动                       |
+| `src/renderer/features/drive/components/DriveFolderPickerDialog.tsx` | 离线任务保存目录选择                     |
+| `src/renderer/features/drive/components/DriveUploadPanel.tsx`        | 上传进度面板                             |
+| `src/renderer/features/drive/components/DriveOfflineDialog.tsx`      | 离线任务提交与列表                       |
+| `src/renderer/features/drive/components/DriveDownloadPanel.tsx`      | 视频下载进度与结果                       |
+| `src/renderer/lib/playback-progress.ts`                              | 按文件和站点保存播放进度                 |
+| `src/renderer/lib/subtitles.ts`                                      | SRT、VTT、ASS、SSA 解析                  |
+| `src/renderer/components/DownloadSettings.tsx`                       | 设置页下载和字幕目录                     |
 
 ### 视频播放分层
 
@@ -99,7 +99,7 @@ Cookie 值不会进入 renderer、IPC 返回值或日志。网盘页只拿到文
 
 - `video-player/VideoPlayerDialog` 只接收 `source`、`title`、`playlist`、`activeId`、`subtitleTracks`、`resumePosition`、`isLoading`、`error` 和回调；HLS、自定义工具栏、字幕菜单、续播提示、可折叠抽屉与响应式都留在这一层，不访问 `window.desktop`，也不导入 `@shared/drive`。
 - `playback/GlobalVideoPlayerProvider` 在 `App` 根部常驻，管理单个播放器请求、最小化状态、悬浮条、播放/暂停、恢复和关闭；任何模块都可通过 `useGlobalVideoPlayer().showPlayer(request)` 使用这套能力，卸载模块页面不会卸载播放器。
-- `playback/DrivePlaybackProvider` 不再渲染播放器或悬浮条，只负责把 `useDrivePlayback` 的播放状态同步到全局宿主，并保留 115 播放错误提示。
+- `features/drive/playback/DrivePlaybackProvider` 不再渲染播放器或悬浮条，只负责把 `useDrivePlayback` 的播放状态同步到全局宿主，并保留 115 播放错误提示。
 - `useDrivePlayback` 负责 `startPlayback` / `stopPlayback`、本地字幕读取、播放进度读写、当前目录视频排序、原地切换、自动连播和错误文案映射。
 - 每次播放请求携带递增序号；过期请求成功时只停止它自己的会话，不覆盖当前视频；新会话成功后才停止旧会话；切换失败时保留当前播放器。
 - 关闭播放器会立即停止当前会话并使所有在途请求失效；在途请求随后返回的会话会被回收。

@@ -10,7 +10,7 @@ import type { DesktopApi, DriveApi } from '@shared/ipc';
 import {
   getPlaybackProgress,
   savePlaybackProgress,
-} from '../lib/playback-progress';
+} from '../../../lib/playback-progress';
 import { useDrivePlayback } from './useDrivePlayback';
 
 interface Deferred<T> {

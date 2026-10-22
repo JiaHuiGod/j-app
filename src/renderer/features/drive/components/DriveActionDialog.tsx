@@ -7,7 +7,7 @@ import {
   type SyntheticEvent,
 } from 'react';
 import type { DriveResult } from '@shared/drive';
-import ui from '../styles/ui.module.css';
+import ui from '../../../styles/ui.module.css';
 import styles from './DriveDialogs.module.css';
 
 type DriveActionDialogMode = 'create-folder' | 'delete' | 'rename';

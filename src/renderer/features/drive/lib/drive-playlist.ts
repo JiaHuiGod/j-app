@@ -1,5 +1,5 @@
 import type { DriveEntry } from '@shared/drive';
-import { getFileKind } from './file-kind';
+import { getFileKind } from '../../../lib/file-kind';
 
 const DOWNLOAD_PREFIX = /^www\.[^@]+@/i;
 const FILE_EXTENSION = /\.[^.]+$/;

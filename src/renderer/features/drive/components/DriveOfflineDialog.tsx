@@ -10,8 +10,8 @@ import type {
   DriveOfflineTask,
   DriveOfflineTaskList,
 } from '@shared/drive';
-import { toErrorMessage } from '../lib/errors';
-import ui from '../styles/ui.module.css';
+import { toErrorMessage } from '../../../lib/errors';
+import ui from '../../../styles/ui.module.css';
 import dialogs from './DriveDialogs.module.css';
 import { DriveFolderPickerDialog } from './DriveFolderPickerDialog';
 import styles from './DriveOfflineDialog.module.css';
