@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -19,6 +20,11 @@ import type {
   DriveVideoDownloadProgress,
 } from '@shared/drive';
 import { toErrorMessage } from '../lib/errors';
+import {
+  formatPlaybackPosition,
+  getPlaybackProgress,
+  savePlaybackProgress,
+} from '../lib/playback-progress';
 import { DriveActionDialog } from '../components/DriveActionDialog';
 import { DriveDownloadPanel } from '../components/DriveDownloadPanel';
 import { DriveMoveDialog } from '../components/DriveMoveDialog';
@@ -57,6 +63,7 @@ interface UploadBatchState {
 interface ActivePlayback {
   readonly entry: DriveEntry;
   readonly playback: DrivePlaybackResult;
+  readonly resumePosition: number | null;
 }
 
 const PAGE_SIZE = 100;
@@ -862,6 +869,7 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
   const offlineSubmittedRef = useRef(false);
   const activeDownloadIdRef = useRef<string | null>(null);
   const cancelRequestedRef = useRef(false);
+  const playbackRequestIdRef = useRef(0);
   const dropUploadRef = useRef<(files: readonly File[]) => void>(() => {});
   const showUploadErrorRef = useRef<(message: string) => void>(() => {});
 
@@ -884,6 +892,28 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
     selectedEntry?.kind === 'file' &&
     getFileKind(selectedEntry.extension) === 'video'
       ? selectedEntry
+      : null;
+  const videoEntries = useMemo(
+    () =>
+      entries
+        .filter(
+          (entry) =>
+            entry.kind === 'file' && getFileKind(entry.extension) === 'video',
+        )
+        .sort((left, right) =>
+          left.name.localeCompare(right.name, 'zh-CN', {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        ),
+    [entries],
+  );
+  const activePlaybackIndex = activePlayback
+    ? videoEntries.findIndex((entry) => entry.id === activePlayback.entry.id)
+    : -1;
+  const selectedVideoProgress =
+    account && selectedVideo
+      ? getPlaybackProgress(account.connectionId, selectedVideo.id)
       : null;
   const canMutate =
     Boolean(account) &&
@@ -1526,15 +1556,16 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       return;
     }
 
+    const requestId = playbackRequestIdRef.current + 1;
+
+    playbackRequestIdRef.current = requestId;
     setIsStartingPlayback(true);
     setPlaybackError(null);
 
     const previous = activePlayback;
-
-    if (previous) {
-      setActivePlayback(null);
-      await stopPlaybackSession(previous.playback.sessionId);
-    }
+    const savedProgress = account
+      ? getPlaybackProgress(account.connectionId, entry.id)
+      : null;
 
     try {
       const result = await window.desktop.drive.startPlayback({
@@ -1542,6 +1573,14 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         pickcode: entry.pickcode,
         fileName: entry.name,
       });
+
+      if (requestId !== playbackRequestIdRef.current) {
+        if (result.ok) {
+          void stopPlaybackSession(result.data.sessionId);
+        }
+
+        return;
+      }
 
       if (!result.ok) {
         setPlaybackError(result.error.message);
@@ -1551,19 +1590,30 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       setActivePlayback({
         entry,
         playback: result.data,
+        resumePosition: savedProgress?.position ?? null,
       });
+
+      if (previous && previous.playback.sessionId !== result.data.sessionId) {
+        void stopPlaybackSession(previous.playback.sessionId);
+      }
     } catch (playFailure: unknown) {
-      setPlaybackError(
-        toErrorMessage(playFailure, '无法开始播放视频，请稍后重试。'),
-      );
+      if (requestId === playbackRequestIdRef.current) {
+        setPlaybackError(
+          toErrorMessage(playFailure, '无法开始播放视频，请稍后重试。'),
+        );
+      }
     } finally {
-      setIsStartingPlayback(false);
+      if (requestId === playbackRequestIdRef.current) {
+        setIsStartingPlayback(false);
+      }
     }
   };
 
   const handleClosePlayback = () => {
     const playback = activePlayback;
 
+    playbackRequestIdRef.current += 1;
+    setIsStartingPlayback(false);
     setActivePlayback(null);
 
     if (playback) {
@@ -1576,14 +1626,44 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
       return;
     }
 
-    const entry = activePlayback.entry;
-    const sessionId = activePlayback.playback.sessionId;
+    void handlePlayVideo(activePlayback.entry);
+  };
 
-    setActivePlayback(null);
-    setIsStartingPlayback(false);
-    void stopPlaybackSession(sessionId).then(() => {
-      void handlePlayVideo(entry);
-    });
+  const handlePlaybackProgress = useCallback(
+    (position: number, duration: number) => {
+      if (!account || !activePlayback) {
+        return;
+      }
+
+      savePlaybackProgress(
+        account.connectionId,
+        activePlayback.entry.id,
+        position,
+        duration,
+      );
+    },
+    [account, activePlayback],
+  );
+
+  const handlePlaybackEnded = () => {
+    if (
+      activePlaybackIndex >= 0 &&
+      activePlaybackIndex + 1 < videoEntries.length
+    ) {
+      const nextEntry = videoEntries[activePlaybackIndex + 1];
+
+      if (nextEntry) {
+        void handlePlayVideo(nextEntry);
+      }
+    }
+  };
+
+  const handlePlaylistSelect = (entryId: string) => {
+    const target = videoEntries.find((entry) => entry.id === entryId);
+
+    if (target) {
+      void handlePlayVideo(target);
+    }
   };
 
   useEffect(() => {
@@ -2092,7 +2172,9 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
                   ? `已选 ${selectedEntries.length} 项`
                   : selectedEntry
                     ? selectedVideo
-                      ? `已选：${selectedEntry.name} · 下载到 ${defaultDownloadDirectory ?? '系统默认位置'}`
+                      ? selectedVideoProgress
+                        ? `已选：${selectedEntry.name} · 继续观看 ${formatPlaybackPosition(selectedVideoProgress.position)}`
+                        : `已选：${selectedEntry.name} · 下载到 ${defaultDownloadDirectory ?? '系统默认位置'}`
                       : `已选：${selectedEntry.name}`
                     : '双击文件夹进入下一层'}
             </span>
@@ -2378,8 +2460,18 @@ export function DrivePage({ isActive, onOpenSettings }: DrivePageProps) {
         <DrivePlayerDialog
           fileName={activePlayback.entry.name}
           playback={activePlayback.playback}
+          resumePosition={activePlayback.resumePosition}
+          playlist={videoEntries.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+          }))}
+          playlistPosition={Math.max(0, activePlaybackIndex + 1)}
+          isSwitching={isStartingPlayback}
+          onSelectPlaylist={handlePlaylistSelect}
           onClose={handleClosePlayback}
           onRetry={handleRetryPlayback}
+          onProgress={handlePlaybackProgress}
+          onEnded={handlePlaybackEnded}
         />
       )}
 

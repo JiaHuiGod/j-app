@@ -21,6 +21,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   downloads: {
     directory: null,
   },
+  subtitles: {
+    directory: null,
+  },
 };
 
 export function createDefaultAppSettings(): AppSettings {

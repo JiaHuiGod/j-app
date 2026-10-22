@@ -73,6 +73,15 @@ const settings = Object.freeze<SettingsApi>({
   clearDownloadDirectory: () => {
     return ipcRenderer.invoke(IpcChannel.ClearDownloadDirectory);
   },
+  getSubtitleDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.GetSubtitleDirectory);
+  },
+  chooseSubtitleDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.ChooseSubtitleDirectory);
+  },
+  clearSubtitleDirectory: () => {
+    return ipcRenderer.invoke(IpcChannel.ClearSubtitleDirectory);
+  },
 });
 
 const connections = Object.freeze<ConnectionsApi>({
@@ -159,6 +168,9 @@ const drive = Object.freeze<DriveApi>({
   },
   stopPlayback: (sessionId: string) => {
     return ipcRenderer.invoke(IpcChannel.StopDrivePlayback, sessionId);
+  },
+  getSubtitles: (fileName: string) => {
+    return ipcRenderer.invoke(IpcChannel.GetDriveSubtitles, fileName);
   },
   onUploadProgress: (listener: (progress: DriveUploadProgress) => void) => {
     const handler = (

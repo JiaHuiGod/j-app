@@ -14,8 +14,10 @@ import { testProxySettings } from './network/proxy';
 import {
   getDownloadDirectory,
   getProxySettings,
+  getSubtitleDirectory,
   saveDownloadDirectory,
   saveProxySettings,
+  saveSubtitleDirectory,
 } from './settings/store';
 
 function getAppInfo(): AppInfo {
@@ -69,6 +71,26 @@ export function registerIpcHandlers(): void {
   });
   ipcMain.handle(IpcChannel.ClearDownloadDirectory, async () => {
     await saveDownloadDirectory(null);
+  });
+  ipcMain.handle(IpcChannel.GetSubtitleDirectory, () => getSubtitleDirectory());
+  ipcMain.handle(IpcChannel.ChooseSubtitleDirectory, async (event) => {
+    const parent = getSenderWindow(event.sender);
+    const options: Electron.OpenDialogOptions = {
+      title: '选择字幕目录',
+      properties: ['openDirectory', 'createDirectory'],
+    };
+    const result = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return saveSubtitleDirectory(result.filePaths[0]);
+  });
+  ipcMain.handle(IpcChannel.ClearSubtitleDirectory, async () => {
+    await saveSubtitleDirectory(null);
   });
   ipcMain.handle(IpcChannel.GetAppearance, () => getAppearanceState());
   ipcMain.handle(IpcChannel.SetAppearanceTheme, (_event, theme: unknown) =>

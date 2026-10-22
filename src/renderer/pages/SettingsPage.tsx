@@ -178,11 +178,11 @@ export function SettingsPage() {
       <header className={styles.header}>
         <div className={styles.heading}>
           <p className={page.eyebrow}>
-            Preferences / Appearance, Downloads &amp; Connections
+            Preferences / Appearance, Downloads, Subtitles &amp; Connections
           </p>
           <h1 id="settings-page-title">设置。</h1>
           <p className={styles.headingLede}>
-            调整应用外观、默认下载目录，并管理需要登录的站点。每个站点使用独立的持久会话保存
+            调整应用外观、默认下载目录和本地字幕目录，并管理需要登录的站点。每个站点使用独立的持久会话保存
             Cookie，登录信息不会进入页面或配置文件。
           </p>
         </div>

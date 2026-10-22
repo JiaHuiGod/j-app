@@ -24,6 +24,7 @@ import {
   open115DownloadFolder,
 } from './download';
 import { start115Playback, stop115Playback } from './playback';
+import { getLocalSubtitles } from './subtitles';
 import { add115OfflineTasks, list115OfflineTasks } from './offline';
 import { upload115Files } from './upload';
 import { list115Folder, search115Folder } from './115';
@@ -422,6 +423,17 @@ export function registerDriveIpcHandlers(): void {
         return stop115Playback(input);
       } catch (error) {
         return unexpectedFailure('stop 115 playback', error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.GetDriveSubtitles,
+    async (_event, input: unknown) => {
+      try {
+        return await getLocalSubtitles(input);
+      } catch (error) {
+        return unexpectedFailure('load local subtitles', error);
       }
     },
   );

@@ -133,6 +133,12 @@ const downloadsSchema = z
   })
   .default({ directory: null });
 
+const subtitlesSchema = z
+  .object({
+    directory: z.string().trim().max(4096).nullable(),
+  })
+  .default({ directory: null });
+
 const appSettingsSchema = z.object({
   schemaVersion: z.literal(3),
   network: z.object({
@@ -141,6 +147,7 @@ const appSettingsSchema = z.object({
   connections: connectionsSchema,
   appearance: appearanceSchema,
   downloads: downloadsSchema,
+  subtitles: subtitlesSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -191,6 +198,9 @@ export function parseAppSettings(input: unknown): AppSettings {
       downloads: {
         directory: null,
       },
+      subtitles: {
+        directory: null,
+      },
     };
   }
 
@@ -214,6 +224,9 @@ export function parseAppSettings(input: unknown): AppSettings {
         theme: 'system',
       },
       downloads: {
+        directory: null,
+      },
+      subtitles: {
         directory: null,
       },
     };

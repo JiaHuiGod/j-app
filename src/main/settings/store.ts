@@ -188,6 +188,33 @@ export async function saveThemePreference(
   return theme;
 }
 
+async function normalizeDirectory(
+  input: unknown,
+  label: string,
+): Promise<string | null> {
+  if (input === null) {
+    return null;
+  }
+
+  if (typeof input !== 'string' || input.length > 4096) {
+    throw new Error(`${label}格式不正确。`);
+  }
+
+  const directory = input.trim();
+
+  if (!directory || !path.isAbsolute(directory)) {
+    throw new Error(`${label}必须是绝对路径。`);
+  }
+
+  const info = await stat(directory).catch(() => null);
+
+  if (!info?.isDirectory()) {
+    throw new Error(`${label}不存在或不是文件夹。`);
+  }
+
+  return directory;
+}
+
 export async function getDownloadDirectory(): Promise<string | null> {
   return (await loadSettings()).downloads.directory;
 }
@@ -195,30 +222,32 @@ export async function getDownloadDirectory(): Promise<string | null> {
 export async function saveDownloadDirectory(
   input: unknown,
 ): Promise<string | null> {
-  let directory: string | null = null;
-
-  if (input !== null) {
-    if (typeof input !== 'string' || input.length > 4096) {
-      throw new Error('下载目录格式不正确。');
-    }
-
-    directory = input.trim();
-
-    if (!directory || !path.isAbsolute(directory)) {
-      throw new Error('下载目录必须是绝对路径。');
-    }
-
-    const info = await stat(directory).catch(() => null);
-
-    if (!info?.isDirectory()) {
-      throw new Error('下载目录不存在或不是文件夹。');
-    }
-  }
+  const directory = await normalizeDirectory(input, '下载目录');
 
   await updateSettings((current) => ({
     ...current,
     downloads: {
       ...current.downloads,
+      directory,
+    },
+  }));
+
+  return directory;
+}
+
+export async function getSubtitleDirectory(): Promise<string | null> {
+  return (await loadSettings()).subtitles.directory;
+}
+
+export async function saveSubtitleDirectory(
+  input: unknown,
+): Promise<string | null> {
+  const directory = await normalizeDirectory(input, '字幕目录');
+
+  await updateSettings((current) => ({
+    ...current,
+    subtitles: {
+      ...current.subtitles,
       directory,
     },
   }));

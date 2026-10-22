@@ -235,3 +235,11 @@ export interface DrivePlaybackResult {
   readonly width: number | null;
   readonly height: number | null;
 }
+
+export type DriveSubtitleFormat = 'ass' | 'srt' | 'ssa' | 'vtt';
+
+export interface DriveSubtitle {
+  readonly name: string;
+  readonly content: string;
+  readonly format: DriveSubtitleFormat;
+}

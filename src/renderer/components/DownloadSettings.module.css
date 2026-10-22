@@ -61,6 +61,10 @@
   border-radius: 13px;
 }
 
+.directoryRow + .directoryRow {
+  margin-top: 8px;
+}
+
 .icon {
   display: grid;
   flex: none;

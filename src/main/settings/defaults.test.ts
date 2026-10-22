@@ -9,4 +9,8 @@ describe('default app settings', () => {
   it('uses the system download location by default', () => {
     expect(createDefaultAppSettings().downloads.directory).toBeNull();
   });
+
+  it('does not load local subtitles until a directory is configured', () => {
+    expect(createDefaultAppSettings().subtitles.directory).toBeNull();
+  });
 });

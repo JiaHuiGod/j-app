@@ -26,6 +26,7 @@ import type {
   DriveVideoDownloadResult,
   DrivePlaybackInput,
   DrivePlaybackResult,
+  DriveSubtitle,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
 
@@ -46,6 +47,9 @@ export const IpcChannel = {
   GetDownloadDirectory: 'settings:get-download-directory',
   ChooseDownloadDirectory: 'settings:choose-download-directory',
   ClearDownloadDirectory: 'settings:clear-download-directory',
+  GetSubtitleDirectory: 'settings:get-subtitle-directory',
+  ChooseSubtitleDirectory: 'settings:choose-subtitle-directory',
+  ClearSubtitleDirectory: 'settings:clear-subtitle-directory',
   GetAppearance: 'appearance:get',
   SetAppearanceTheme: 'appearance:set-theme',
   RestartApp: 'app:restart',
@@ -71,6 +75,7 @@ export const IpcChannel = {
   OpenDriveDownloadFolder: 'drive:video-open-folder',
   StartDrivePlayback: 'drive:playback-start',
   StopDrivePlayback: 'drive:playback-stop',
+  GetDriveSubtitles: 'drive:subtitles',
   DriveUploadProgress: 'drive:upload-progress',
   DriveVideoDownloadProgress: 'drive:video-download-progress',
 } as const;
@@ -101,6 +106,9 @@ export interface SettingsApi {
   getDownloadDirectory: () => Promise<string | null>;
   chooseDownloadDirectory: () => Promise<string | null>;
   clearDownloadDirectory: () => Promise<void>;
+  getSubtitleDirectory: () => Promise<string | null>;
+  chooseSubtitleDirectory: () => Promise<string | null>;
+  clearSubtitleDirectory: () => Promise<void>;
 }
 
 export interface AppearanceApi {
@@ -153,6 +161,9 @@ export interface DriveApi {
     input: DrivePlaybackInput,
   ) => Promise<DriveResult<DrivePlaybackResult>>;
   stopPlayback: (sessionId: string) => Promise<DriveResult<null>>;
+  getSubtitles: (
+    fileName: string,
+  ) => Promise<DriveResult<readonly DriveSubtitle[]>>;
   onUploadProgress: (
     listener: (progress: DriveUploadProgress) => void,
   ) => () => void;

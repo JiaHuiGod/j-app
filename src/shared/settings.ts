@@ -26,6 +26,9 @@ export interface AppSettings {
   readonly downloads: {
     readonly directory: string | null;
   };
+  readonly subtitles: {
+    readonly directory: string | null;
+  };
 }
 
 export type ProxyTestTargetId = 'google' | 'github';

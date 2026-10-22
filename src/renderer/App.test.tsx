@@ -152,6 +152,15 @@ let chooseDownloadDirectory: ReturnType<
 let clearDownloadDirectory: ReturnType<
   typeof vi.fn<SettingsApi['clearDownloadDirectory']>
 >;
+let getSubtitleDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['getSubtitleDirectory']>
+>;
+let chooseSubtitleDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['chooseSubtitleDirectory']>
+>;
+let clearSubtitleDirectory: ReturnType<
+  typeof vi.fn<SettingsApi['clearSubtitleDirectory']>
+>;
 let toggleMaximize: ReturnType<typeof vi.fn<() => void>>;
 let restartApp: ReturnType<typeof vi.fn<() => void>>;
 let listConnections: ReturnType<typeof vi.fn<ConnectionsApi['list']>>;
@@ -182,6 +191,7 @@ let openDriveDownloadFolder: ReturnType<
 >;
 let startDrivePlayback: ReturnType<typeof vi.fn<DriveApi['startPlayback']>>;
 let stopDrivePlayback: ReturnType<typeof vi.fn<DriveApi['stopPlayback']>>;
+let getDriveSubtitles: ReturnType<typeof vi.fn<DriveApi['getSubtitles']>>;
 let onDriveVideoDownloadProgress: ReturnType<
   typeof vi.fn<DriveApi['onVideoDownloadProgress']>
 >;
@@ -192,6 +202,7 @@ let getAppearance: ReturnType<typeof vi.fn<AppearanceApi['get']>>;
 let setAppearanceTheme: ReturnType<typeof vi.fn<AppearanceApi['setTheme']>>;
 
 beforeEach(() => {
+  window.localStorage.clear();
   getAppInfo = vi.fn<() => Promise<AppInfo>>().mockResolvedValue(appInfo);
   getProxy = vi
     .fn<() => Promise<ProxySettings>>()
@@ -207,6 +218,15 @@ beforeEach(() => {
     .mockResolvedValue('C:\\Downloads');
   clearDownloadDirectory = vi
     .fn<SettingsApi['clearDownloadDirectory']>()
+    .mockResolvedValue(undefined);
+  getSubtitleDirectory = vi
+    .fn<SettingsApi['getSubtitleDirectory']>()
+    .mockResolvedValue(null);
+  chooseSubtitleDirectory = vi
+    .fn<SettingsApi['chooseSubtitleDirectory']>()
+    .mockResolvedValue('D:\\Subtitles');
+  clearSubtitleDirectory = vi
+    .fn<SettingsApi['clearSubtitleDirectory']>()
     .mockResolvedValue(undefined);
   toggleMaximize = vi.fn<() => void>();
   restartApp = vi.fn<() => void>();
@@ -322,6 +342,9 @@ beforeEach(() => {
   stopDrivePlayback = vi
     .fn<DriveApi['stopPlayback']>()
     .mockResolvedValue({ ok: true, data: null });
+  getDriveSubtitles = vi
+    .fn<DriveApi['getSubtitles']>()
+    .mockResolvedValue({ ok: true, data: [] });
   onDriveUploadProgress = vi
     .fn<DriveApi['onUploadProgress']>()
     .mockReturnValue(() => {});
@@ -346,6 +369,9 @@ beforeEach(() => {
     getDownloadDirectory,
     chooseDownloadDirectory,
     clearDownloadDirectory,
+    getSubtitleDirectory,
+    chooseSubtitleDirectory,
+    clearSubtitleDirectory,
   };
   const connections: ConnectionsApi = {
     list: listConnections,
@@ -372,6 +398,7 @@ beforeEach(() => {
     openDownloadFolder: openDriveDownloadFolder,
     startPlayback: startDrivePlayback,
     stopPlayback: stopDrivePlayback,
+    getSubtitles: getDriveSubtitles,
     onUploadProgress: onDriveUploadProgress,
     onVideoDownloadProgress: onDriveVideoDownloadProgress,
   };
@@ -1225,6 +1252,113 @@ describe('App', () => {
     });
   });
 
+  it('resumes a video and supports subtitles and playlist navigation', async () => {
+    const connectionId = driveAccount.connectionId;
+
+    window.localStorage.setItem(
+      `japp.playback-progress.v1:${connectionId}:71`,
+      JSON.stringify({
+        position: 125,
+        duration: 3600,
+        updatedAt: Date.now(),
+      }),
+    );
+    getDriveSubtitles.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          name: 'first.zh-CN.srt',
+          content: `1
+00:00:01,000 --> 00:00:03,000
+测试字幕
+`,
+          format: 'srt',
+        },
+      ],
+    });
+    listDriveAccounts.mockResolvedValue({
+      ok: true,
+      data: [driveAccount],
+    });
+    listDriveFolder.mockResolvedValue({
+      ok: true,
+      data: {
+        accountId: connectionId,
+        folderId: '0',
+        breadcrumbs: [{ id: '0', name: '根目录' }],
+        entries: [
+          {
+            id: '71',
+            parentId: '0',
+            name: 'first.mp4',
+            kind: 'file',
+            size: 2048,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 3600,
+            pickcode: 'first-pickcode',
+          },
+          {
+            id: '72',
+            parentId: '0',
+            name: 'second.mp4',
+            kind: 'file',
+            size: 2048,
+            modifiedAt: '2026-10-21T09:00:00.000Z',
+            extension: 'mp4',
+            durationSeconds: 3600,
+            pickcode: 'second-pickcode',
+          },
+        ],
+        offset: 0,
+        limit: 100,
+        total: 2,
+        hasMore: false,
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '网盘' }));
+    fireEvent.click(await screen.findByText('first.mp4'));
+
+    expect(screen.getByText(/继续观看 2:05/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '播放' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /播放 first\.mp4/,
+    });
+    await waitFor(() => {
+      expect(getDriveSubtitles).toHaveBeenCalledWith('first.mp4');
+      expect(
+        within(dialog).getByRole('option', { name: 'first.zh-CN.srt' }),
+      ).toBeTruthy();
+    });
+
+    expect(
+      within(dialog).getByRole('button', { name: '关闭字幕' }),
+    ).toBeTruthy();
+    expect(within(dialog).getByTitle('second.mp4')).toBeTruthy();
+    fireEvent.click(within(dialog).getByTitle('second.mp4'));
+
+    await waitFor(() => {
+      expect(startDrivePlayback).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pickcode: 'second-pickcode',
+          fileName: 'second.mp4',
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(dialog.isConnected).toBe(true);
+      expect(dialog.getAttribute('aria-label')).toContain('second.mp4');
+    });
+  });
+
   it('searches only inside the current 115 folder', async () => {
     listDriveAccounts.mockResolvedValue({
       ok: true,
@@ -1494,11 +1628,20 @@ describe('App', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '设置' }));
-    fireEvent.click(await screen.findByRole('button', { name: '选择目录' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: '选择下载目录' }),
+    );
 
     await waitFor(() => {
       expect(chooseDownloadDirectory).toHaveBeenCalledOnce();
     });
     expect(await screen.findByText('D:\\Downloads')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: '选择字幕目录' }));
+
+    await waitFor(() => {
+      expect(chooseSubtitleDirectory).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText('D:\\Subtitles')).toBeDefined();
   });
 });

@@ -69,6 +69,9 @@ describe('application settings migration', () => {
       downloads: {
         directory: null,
       },
+      subtitles: {
+        directory: null,
+      },
     });
   });
 
