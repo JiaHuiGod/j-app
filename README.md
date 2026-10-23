@@ -130,8 +130,9 @@ j-app/
 │  │  │  ├─ schema.test.ts      # 配置校验测试
 │  │  │  └─ store.ts            # 单文件配置仓库、原子写入与坏文件恢复
 │  │  ├─ index.ts               # 应用生命周期、单实例、启动流程
-│  │  ├─ ipc.ts                 # ipcMain 处理器
-│  │  ├─ security.ts            # CSP 与 webview 防护
+│  │  ├─ dev-user-data.ts      # 开发环境独立 userData 与一次性迁移
+│  │  ├─ ipc.ts                # ipcMain 处理器
+│  │  ├─ security.ts           # CSP 与 webview 防护
 │  │  ├─ window-state.ts        # 窗口尺寸校验、多显示器回退
 │  │  └─ window.ts              # BrowserWindow、导航、外链与窗口状态持久化
 │  ├─ preload/                  # 预加载：受控 API 边界
@@ -385,7 +386,7 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 app.getPath('userData')/settings.json
 ```
 
-在 Windows 下即 `%APPDATA%\J App\settings.json`。当前结构：
+在 Windows 下，打包版即 `%APPDATA%\J App\settings.json`；开发版使用独立的目录，见下节。当前结构：
 
 ```json
 {
@@ -426,6 +427,34 @@ app.getPath('userData')/settings.json
 - **不把配置接口做成一个巨大的设置页**。统一存储不等于把所有 UI 堆在一起，网络代理这类全局能力由标题栏上下文入口打开独立弹窗；外观与账号连接则放在设置页集中管理。
 
 后续新增配置时，在 `AppSettings`、Zod schema、默认值和对应的 IPC 方法中扩展同一个结构。若修改已有字段的语义，需要提升 `schemaVersion` 并在 store 中加入迁移逻辑。当前版本不保存账号密码；Cookie 由独立 Session 保存，不写入 JSON；如果将来需要代理认证，密码应使用 Electron `safeStorage` 单独加密。
+
+### 开发环境用户数据
+
+开发版（`pnpm start` / `app.isPackaged === false`）使用独立目录：
+
+```text
+%APPDATA%\J App Dev
+```
+
+打包版继续使用 `%APPDATA%\J App`，两者配置互不覆盖。
+
+开发版第一次启动时会从共享目录 `J App` 复制一次现有配置：
+
+- `settings.json`
+- `Local State`（包含 Chromium Cookie 加密密钥）
+- `Partitions`（站点 Cookie、Local Storage、IndexedDB 等）
+- 根目录 `Local Storage`、`Preferences` 等运行数据
+- 跳过 Cache、GPUCache、Crashpad、锁文件等可重建内容
+
+原 `J App` 目录只读复制，不会被删除或修改，因此已安装版本仍可继续使用原配置。复制完成后会在 `J App Dev` 写入 `.japp-dev-migration-v1` 标记，后续开发运行不会再覆盖新目录中的改动。
+
+注意事项：
+
+- 第一次启动开发版前，建议先关闭已安装版本和旧开发实例，避免 Cookie 数据库被占用；
+- 如果某项文件因占用复制失败，不写入完成标记，下次启动会继续补齐；
+- 如果新目录已经存在同名文件，不会被覆盖；
+- 复制后设置、窗口状态、本地视频配置和站点 Cookie 通常可以直接继续使用；如果某个站点的加密 Cookie 因系统密钥环境无法恢复，重新登录该站点即可；
+- 显式传入 `--user-data-dir` 时会跳过这套开发目录和迁移逻辑。
 
 ### 网络代理
 

@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 import { applyThemePreference } from './appearance/theme';
 import { cleanupOrphanSitePartitions } from './connections/partition-cleanup';
+import { configureDevUserData } from './dev-user-data';
 import { registerIpcHandlers } from './ipc';
 import { registerLocalVideoProtocol } from './local-video/protocol';
 import { applyProxySettings } from './network/proxy';
@@ -9,13 +10,15 @@ import { installSecurityPolicies } from './security';
 import { loadSettings } from './settings/store';
 import { createMainWindow, focusMainWindow } from './window';
 
+app.setName('J App');
+
 if (started) {
   // Squirrel uses this process to create or remove Windows shortcuts.
   app.quit();
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.setName('J App');
+  configureDevUserData();
 
   app.on('second-instance', () => {
     focusMainWindow();
