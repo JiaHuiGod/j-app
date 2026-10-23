@@ -32,7 +32,11 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 }
 
-if (started) {
+if (process.argv.includes('--squirrel-firstrun')) {
+  // Squirrel starts the app after a fresh install only to satisfy its
+  // first-run contract. Do not create a window or tray in that process.
+  app.quit();
+} else if (started) {
   // Squirrel uses this process to create or remove Windows shortcuts.
   app.quit();
 } else if (!app.requestSingleInstanceLock()) {

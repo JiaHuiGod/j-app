@@ -8,7 +8,7 @@ import {
   UPDATE_REPOSITORY,
 } from './feed';
 
-const AUTO_CHECK_DELAY_MS = 20_000;
+const AUTO_CHECK_DELAY_MS = 2 * 60_000;
 const AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60_000;
 
 let initialized = false;
@@ -56,11 +56,27 @@ function releaseInfo(
   };
 }
 
+function normalizeUpdateError(error: Error): string {
+  const message = error.message;
+
+  if (
+    /couldn't acquire lock|another instance running|4294967295/i.test(message)
+  ) {
+    return '更新服务正在准备中，请稍后重试。';
+  }
+
+  if (/net::|ENOTFOUND|ECONN|ETIMEDOUT|timed? ?out|network/i.test(message)) {
+    return '无法连接更新服务，请检查网络或代理后重试。';
+  }
+
+  return '检查更新失败，请稍后重试。';
+}
+
 function handleUpdaterError(error: Error): void {
   console.error('Auto update error:', error);
   setState({
     status: 'error',
-    error: error.message || '检查更新失败，请稍后重试。',
+    error: normalizeUpdateError(error),
     lastCheckedAt: new Date().toISOString(),
   });
 }
