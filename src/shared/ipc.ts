@@ -32,6 +32,7 @@ import type {
   DriveSubtitle,
 } from './drive';
 import type { ProxySettings, ProxyTestResult } from './settings';
+import type { DesktopBehaviorState, DesktopBehaviorUpdate } from './settings';
 import type { LocalVideoApi } from './local-video';
 
 /**
@@ -45,6 +46,9 @@ export const IpcChannel = {
   WindowClose: 'window:close',
   WindowIsMaximized: 'window:is-maximized',
   WindowMaximizedChanged: 'window:maximized-changed',
+  AppNavigate: 'app:navigate',
+  GetDesktopBehavior: 'desktop:get-behavior',
+  SaveDesktopBehavior: 'desktop:save-behavior',
   GetProxySettings: 'settings:get-proxy',
   SaveProxySettings: 'settings:save-proxy',
   TestProxySettings: 'settings:test-proxy',
@@ -109,6 +113,13 @@ export interface WindowControls {
   close: () => void;
   isMaximized: () => Promise<boolean>;
   onMaximizedChange: (listener: (isMaximized: boolean) => void) => () => void;
+}
+
+export type AppNavigationTarget = 'local' | 'settings';
+
+export interface DesktopBehaviorApi {
+  get: () => Promise<DesktopBehaviorState>;
+  save: (input: DesktopBehaviorUpdate) => Promise<DesktopBehaviorState>;
 }
 
 export interface SettingsApi {
@@ -195,10 +206,14 @@ export interface DesktopApi {
   readonly platform: string;
   readonly getAppInfo: () => Promise<AppInfo>;
   readonly windowControls: WindowControls;
+  readonly desktop: DesktopBehaviorApi;
   readonly settings: SettingsApi;
   readonly appearance: AppearanceApi;
   readonly connections: ConnectionsApi;
   readonly drive: DriveApi;
   readonly localVideo: LocalVideoApi;
+  readonly onNavigate: (
+    listener: (page: AppNavigationTarget) => void,
+  ) => () => void;
   readonly restartApp: () => void;
 }

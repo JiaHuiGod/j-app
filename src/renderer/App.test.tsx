@@ -24,7 +24,7 @@ import type {
   SettingsApi,
 } from '@shared/ipc';
 import type { LocalVideoApi } from '@shared/local-video';
-import type { ProxySettings } from '@shared/settings';
+import type { DesktopBehaviorState, ProxySettings } from '@shared/settings';
 import App from './App';
 
 const appInfo: AppInfo = {
@@ -48,6 +48,13 @@ const proxySettings: ProxySettings = {
 const appearanceState: AppearanceState = {
   preference: 'system',
   resolved: 'light',
+};
+
+const desktopBehaviorState: DesktopBehaviorState = {
+  closeToTray: true,
+  startAtLogin: false,
+  startHidden: true,
+  canAutoStart: true,
 };
 
 const siteConnection: SiteConnectionSummary = {
@@ -166,6 +173,10 @@ let clearSubtitleDirectory: ReturnType<
 >;
 let toggleMaximize: ReturnType<typeof vi.fn<() => void>>;
 let restartApp: ReturnType<typeof vi.fn<() => void>>;
+let getDesktopBehavior: ReturnType<typeof vi.fn<DesktopApi['desktop']['get']>>;
+let saveDesktopBehavior: ReturnType<
+  typeof vi.fn<DesktopApi['desktop']['save']>
+>;
 let listConnections: ReturnType<typeof vi.fn<ConnectionsApi['list']>>;
 let createConnection: ReturnType<typeof vi.fn<ConnectionsApi['create']>>;
 let createPresetConnection: ReturnType<
@@ -234,6 +245,14 @@ beforeEach(() => {
     .mockResolvedValue(undefined);
   toggleMaximize = vi.fn<() => void>();
   restartApp = vi.fn<() => void>();
+  getDesktopBehavior = vi
+    .fn<DesktopApi['desktop']['get']>()
+    .mockResolvedValue(desktopBehaviorState);
+  saveDesktopBehavior = vi
+    .fn<DesktopApi['desktop']['save']>()
+    .mockImplementation((input) =>
+      Promise.resolve({ ...desktopBehaviorState, ...input }),
+    );
   listConnections = vi.fn<ConnectionsApi['list']>().mockResolvedValue([]);
   createConnection = vi
     .fn<ConnectionsApi['create']>()
@@ -453,11 +472,16 @@ beforeEach(() => {
     platform: 'win32',
     getAppInfo,
     windowControls,
+    desktop: {
+      get: getDesktopBehavior,
+      save: saveDesktopBehavior,
+    },
     settings,
     appearance,
     connections,
     drive,
     localVideo,
+    onNavigate: vi.fn<DesktopApi['onNavigate']>().mockReturnValue(() => {}),
     restartApp,
   };
 
@@ -2008,6 +2032,29 @@ describe('App', () => {
     expect(
       await screen.findByRole('radio', { name: /深色/, checked: true }),
     ).toBeDefined();
+  });
+
+  it('updates desktop behavior from the settings page', async () => {
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+    const closeToTray = await screen.findByRole('checkbox', {
+      name: /关闭窗口时最小化到托盘/,
+    });
+
+    fireEvent.click(closeToTray);
+
+    await waitFor(() => {
+      expect(saveDesktopBehavior).toHaveBeenCalledWith({
+        closeToTray: false,
+        startAtLogin: false,
+        startHidden: true,
+      });
+    });
   });
 
   it('sets the default download directory from the settings page', async () => {

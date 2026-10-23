@@ -160,6 +160,60 @@
   line-height: 1.5;
 }
 
+.desktopOptions {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.desktopOption {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: rgb(255 253 248 / 70%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.desktopOption > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.desktopOption strong {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.desktopOption small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.desktopOption input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.desktopOption:has(input:disabled) {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.desktopError {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.66rem;
+}
+
 .addButton {
   align-self: flex-start;
 }
@@ -537,6 +591,10 @@
   .card {
     background: rgb(24 27 34 / 74%);
     box-shadow: 0 20px 50px -42px rgb(0 0 0 / 72%);
+  }
+
+  .desktopOption {
+    background: rgb(255 255 255 / 4%);
   }
 
   .warning {

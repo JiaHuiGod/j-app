@@ -3,6 +3,10 @@ import type {
   ClearAllSiteConnectionsResult,
   SiteConnectionSummary,
 } from '@shared/connections';
+import type {
+  DesktopBehaviorState,
+  DesktopBehaviorUpdate,
+} from '@shared/settings';
 import { AddSiteDialog } from '../components/AddSiteDialog';
 import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { DownloadSettings } from '../components/DownloadSettings';
@@ -96,6 +100,10 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [pinningId, setPinningId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [desktopBehavior, setDesktopBehavior] =
+    useState<DesktopBehaviorState | null>(null);
+  const [isDesktopSaving, setIsDesktopSaving] = useState(false);
+  const [desktopError, setDesktopError] = useState('');
   const [error, setError] = useState('');
   const isMountedRef = useRef(true);
 
@@ -131,6 +139,63 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
       isMountedRef.current = false;
     };
   }, [loadConnections]);
+
+  useEffect(() => {
+    let active = true;
+
+    void window.desktop.desktop
+      .get()
+      .then((behavior) => {
+        if (active) {
+          setDesktopBehavior(behavior);
+        }
+      })
+      .catch((desktopFailure: unknown) => {
+        if (active) {
+          setDesktopError(
+            toErrorMessage(desktopFailure, '读取启动与后台设置失败。'),
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleDesktopBehaviorChange = async (
+    patch: Partial<DesktopBehaviorUpdate>,
+  ) => {
+    if (!desktopBehavior || isDesktopSaving) {
+      return;
+    }
+
+    setIsDesktopSaving(true);
+    setDesktopError('');
+
+    try {
+      const next = await window.desktop.desktop.save({
+        closeToTray: desktopBehavior.closeToTray,
+        startAtLogin: desktopBehavior.startAtLogin,
+        startHidden: desktopBehavior.startHidden,
+        ...patch,
+      });
+
+      if (isMountedRef.current) {
+        setDesktopBehavior(next);
+      }
+    } catch (desktopFailure: unknown) {
+      if (isMountedRef.current) {
+        setDesktopError(
+          toErrorMessage(desktopFailure, '保存启动与后台设置失败。'),
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsDesktopSaving(false);
+      }
+    }
+  };
 
   const handleAdded = (connection: SiteConnectionSummary) => {
     setConnections((current) => [connection, ...current]);
@@ -286,6 +351,102 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
           void appearance.setPreference(theme);
         }}
       />
+
+      <section aria-labelledby="desktop-settings-title" className={styles.card}>
+        <header className={styles.cardHeader}>
+          <div>
+            <p className={styles.kicker}>Desktop</p>
+            <h2 id="desktop-settings-title">启动与后台</h2>
+            <p>控制关闭窗口后的行为，以及是否随系统登录启动。</p>
+          </div>
+        </header>
+
+        <div className={styles.desktopOptions}>
+          <label
+            aria-label="关闭窗口时最小化到托盘"
+            className={styles.desktopOption}
+            htmlFor="desktop-close-to-tray"
+          >
+            <span>
+              <strong>关闭窗口时最小化到托盘</strong>
+              <small>关闭后应用继续在后台运行，可从托盘重新打开。</small>
+            </span>
+            <input
+              id="desktop-close-to-tray"
+              checked={desktopBehavior?.closeToTray ?? false}
+              disabled={!desktopBehavior || isDesktopSaving}
+              type="checkbox"
+              onChange={(event) => {
+                void handleDesktopBehaviorChange({
+                  closeToTray: event.target.checked,
+                });
+              }}
+            />
+          </label>
+
+          <label
+            aria-label="开机自动启动"
+            className={styles.desktopOption}
+            htmlFor="desktop-start-at-login"
+          >
+            <span>
+              <strong>开机自动启动</strong>
+              <small>
+                {desktopBehavior?.canAutoStart
+                  ? '登录系统后自动启动 J App。'
+                  : '仅安装后的 Windows/macOS 版本可用。'}
+              </small>
+            </span>
+            <input
+              id="desktop-start-at-login"
+              checked={desktopBehavior?.startAtLogin ?? false}
+              disabled={
+                !desktopBehavior ||
+                isDesktopSaving ||
+                !desktopBehavior.canAutoStart
+              }
+              type="checkbox"
+              onChange={(event) => {
+                void handleDesktopBehaviorChange({
+                  startAtLogin: event.target.checked,
+                });
+              }}
+            />
+          </label>
+
+          <label
+            aria-label="自启动时隐藏到托盘"
+            className={styles.desktopOption}
+            htmlFor="desktop-start-hidden"
+          >
+            <span>
+              <strong>自启动时隐藏到托盘</strong>
+              <small>开机自启时不显示主窗口，只保留托盘图标。</small>
+            </span>
+            <input
+              id="desktop-start-hidden"
+              checked={desktopBehavior?.startHidden ?? false}
+              disabled={
+                !desktopBehavior ||
+                isDesktopSaving ||
+                !desktopBehavior.canAutoStart
+              }
+              type="checkbox"
+              onChange={(event) => {
+                void handleDesktopBehaviorChange({
+                  startHidden: event.target.checked,
+                });
+              }}
+            />
+          </label>
+        </div>
+
+        {desktopError && (
+          <p className={styles.desktopError} role="alert">
+            {desktopError}
+          </p>
+        )}
+      </section>
 
       <DownloadSettings />
 

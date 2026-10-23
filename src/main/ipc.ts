@@ -2,6 +2,10 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { IpcChannel, type AppInfo } from '@shared/ipc';
 import { getAppearanceState, setAppearanceTheme } from './appearance/theme';
 import {
+  getDesktopBehaviorState,
+  saveDesktopBehaviorState,
+} from './desktop-behavior';
+import {
   clearAllSiteConnectionData,
   createSiteConnection,
   createSitePreset,
@@ -13,6 +17,7 @@ import {
 import { registerDriveIpcHandlers } from './drive/ipc';
 import { registerLocalVideoIpcHandlers } from './local-video/ipc';
 import { testProxySettings } from './network/proxy';
+import { setCloseToTrayEnabled } from './window';
 import {
   getDownloadDirectory,
   getProxySettings,
@@ -44,6 +49,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannel.WindowIsMaximized, (event) => {
     return getSenderWindow(event.sender)?.isMaximized() ?? false;
   });
+  ipcMain.handle(IpcChannel.GetDesktopBehavior, () =>
+    getDesktopBehaviorState(),
+  );
+  ipcMain.handle(
+    IpcChannel.SaveDesktopBehavior,
+    async (_event, input: unknown) => {
+      const state = await saveDesktopBehaviorState(input);
+      setCloseToTrayEnabled(state.closeToTray);
+      return state;
+    },
+  );
   ipcMain.handle(IpcChannel.GetProxySettings, () => getProxySettings());
   ipcMain.handle(
     IpcChannel.SaveProxySettings,

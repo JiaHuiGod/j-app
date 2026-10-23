@@ -5,9 +5,11 @@ import type {
   SiteConnection,
 } from '@shared/connections';
 import {
+  DEFAULT_DESKTOP_SETTINGS,
   DEFAULT_WINDOW_STATE,
   PROXY_PROTOCOLS,
   type AppSettings,
+  type DesktopBehaviorUpdate,
   type ProxySettings,
   type WindowStateSettings,
 } from '@shared/settings';
@@ -177,6 +179,21 @@ const windowStateSchema = z
   })
   .default(DEFAULT_WINDOW_STATE);
 
+const desktopSchema = z
+  .object({
+    closeToTray: z.boolean(),
+    startAtLogin: z.boolean(),
+    startHidden: z.boolean(),
+    trayTipShown: z.boolean(),
+  })
+  .default(DEFAULT_DESKTOP_SETTINGS);
+
+const desktopBehaviorUpdateSchema = z.object({
+  closeToTray: z.boolean(),
+  startAtLogin: z.boolean(),
+  startHidden: z.boolean(),
+});
+
 const appSettingsSchema = z.object({
   schemaVersion: z.literal(3),
   network: z.object({
@@ -188,6 +205,7 @@ const appSettingsSchema = z.object({
   subtitles: subtitlesSchema,
   localVideo: localVideoSchema,
   windowState: windowStateSchema,
+  desktop: desktopSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -215,6 +233,18 @@ export function parseProxySettings(input: unknown): ProxySettings {
 
 export function parseWindowState(input: unknown): WindowStateSettings {
   const result = windowStateSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new Error(formatSchemaError(result.error));
+  }
+
+  return result.data;
+}
+
+export function parseDesktopBehaviorUpdate(
+  input: unknown,
+): DesktopBehaviorUpdate {
+  const result = desktopBehaviorUpdateSchema.safeParse(input);
 
   if (!result.success) {
     throw new Error(formatSchemaError(result.error));
@@ -255,6 +285,7 @@ export function parseAppSettings(input: unknown): AppSettings {
         directories: [],
       },
       windowState: DEFAULT_WINDOW_STATE,
+      desktop: DEFAULT_DESKTOP_SETTINGS,
     };
   }
 
@@ -287,6 +318,7 @@ export function parseAppSettings(input: unknown): AppSettings {
         directories: [],
       },
       windowState: DEFAULT_WINDOW_STATE,
+      desktop: DEFAULT_DESKTOP_SETTINGS,
     };
   }
 

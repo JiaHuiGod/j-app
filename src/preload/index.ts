@@ -27,6 +27,7 @@ import type {
 import {
   IpcChannel,
   type AppearanceApi,
+  type AppNavigationTarget,
   type ConnectionsApi,
   type DesktopApi,
   type DriveApi,
@@ -61,6 +62,13 @@ const windowControls = Object.freeze<WindowControls>({
     return () => {
       ipcRenderer.removeListener(IpcChannel.WindowMaximizedChanged, handler);
     };
+  },
+});
+
+const desktop = Object.freeze<DesktopApi['desktop']>({
+  get: () => ipcRenderer.invoke(IpcChannel.GetDesktopBehavior),
+  save: (input) => {
+    return ipcRenderer.invoke(IpcChannel.SaveDesktopBehavior, input);
   },
 });
 
@@ -252,11 +260,23 @@ const desktopApi = Object.freeze<DesktopApi>({
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
   windowControls,
+  desktop,
   settings,
   appearance,
   connections,
   drive,
   localVideo,
+  onNavigate: (listener: (page: AppNavigationTarget) => void) => {
+    const handler = (_event: IpcRendererEvent, page: AppNavigationTarget) => {
+      listener(page);
+    };
+
+    ipcRenderer.on(IpcChannel.AppNavigate, handler);
+
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.AppNavigate, handler);
+    };
+  },
   restartApp: () => {
     ipcRenderer.send(IpcChannel.RestartApp);
   },

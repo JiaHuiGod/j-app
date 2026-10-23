@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseAppSettings,
   parseCreateSiteConnectionInput,
+  parseDesktopBehaviorUpdate,
   parseProxySettings,
   parseThemePreference,
   parseWindowState,
@@ -82,6 +83,12 @@ describe('application settings migration', () => {
         width: 1180,
         height: 760,
         maximized: false,
+      },
+      desktop: {
+        closeToTray: true,
+        startAtLogin: false,
+        startHidden: true,
+        trayTipShown: false,
       },
     });
   });
@@ -235,6 +242,30 @@ describe('window state validation', () => {
         maximized: false,
       }),
     ).toThrow(/900|too small/i);
+  });
+});
+
+describe('desktop behavior validation', () => {
+  it('accepts the three user-controlled toggles', () => {
+    expect(
+      parseDesktopBehaviorUpdate({
+        closeToTray: false,
+        startAtLogin: true,
+        startHidden: true,
+      }),
+    ).toEqual({
+      closeToTray: false,
+      startAtLogin: true,
+      startHidden: true,
+    });
+  });
+
+  it('rejects incomplete behavior updates', () => {
+    expect(() =>
+      parseDesktopBehaviorUpdate({
+        closeToTray: true,
+      }),
+    ).toThrow(/startAtLogin|startHidden|invalid/i);
   });
 });
 

@@ -1,14 +1,24 @@
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import started from 'electron-squirrel-startup';
 import { applyThemePreference } from './appearance/theme';
 import { cleanupOrphanSitePartitions } from './connections/partition-cleanup';
+import { shouldStartHidden, showTrayTipOnce } from './desktop-behavior';
 import { configureDevUserData } from './dev-user-data';
 import { registerIpcHandlers } from './ipc';
 import { registerLocalVideoProtocol } from './local-video/protocol';
 import { applyProxySettings } from './network/proxy';
 import { installSecurityPolicies } from './security';
 import { loadSettings } from './settings/store';
-import { createMainWindow, focusMainWindow } from './window';
+import { createAppTray, destroyAppTray, refreshTrayMenu } from './tray';
+import {
+  createMainWindow,
+  isCloseToTrayEnabled,
+  markAppQuitting,
+  setCloseToTrayEnabled,
+  setCloseToTrayHandler,
+  setWindowVisibilityHandler,
+  showMainWindow,
+} from './window';
 
 app.setName('J App');
 
@@ -21,7 +31,15 @@ if (started) {
   configureDevUserData();
 
   app.on('second-instance', () => {
-    focusMainWindow();
+    void showMainWindow();
+  });
+
+  app.on('before-quit', () => {
+    markAppQuitting();
+  });
+
+  app.on('will-quit', () => {
+    destroyAppTray();
   });
 
   void app
@@ -34,7 +52,9 @@ if (started) {
       installSecurityPolicies();
 
       const settings = await loadSettings();
+      const startHidden = shouldStartHidden(settings.desktop);
 
+      setCloseToTrayEnabled(settings.desktop.closeToTray);
       applyThemePreference(settings.appearance.theme);
 
       try {
@@ -51,12 +71,33 @@ if (started) {
 
       registerIpcHandlers();
       registerLocalVideoProtocol();
-      await createMainWindow();
+      await createMainWindow({ hidden: startHidden });
+
+      const trayReady = createAppTray({
+        onQuit: () => {
+          markAppQuitting();
+          app.quit();
+        },
+      });
+
+      if (!trayReady) {
+        setCloseToTrayEnabled(false);
+
+        if (startHidden) {
+          await showMainWindow();
+        }
+      } else {
+        setCloseToTrayHandler(() => {
+          showTrayTipOnce(() => {
+            void showMainWindow();
+          });
+        });
+        setWindowVisibilityHandler(refreshTrayMenu);
+        refreshTrayMenu();
+      }
 
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-          void createMainWindow();
-        }
+        void showMainWindow();
       });
     })
     .catch((error: unknown) => {
@@ -65,7 +106,7 @@ if (started) {
     });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
+    if (process.platform !== 'darwin' && !isCloseToTrayEnabled()) {
       app.quit();
     }
   });

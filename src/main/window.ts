@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { app, BrowserWindow, screen, shell } from 'electron';
-import { IpcChannel } from '@shared/ipc';
+import { IpcChannel, type AppNavigationTarget } from '@shared/ipc';
 import type { WindowStateSettings } from '@shared/settings';
 import { DEFAULT_WINDOW_STATE } from '@shared/settings';
+import { getAppIconPath } from './app-icon';
 import { getWindowBackgroundColor } from './appearance/theme';
 import { getWindowState, saveWindowState } from './settings/store';
 import {
@@ -13,9 +14,7 @@ import {
   type WindowDisplay,
 } from './window-state';
 
-const WINDOW_ICON = app.isPackaged
-  ? path.join(process.resourcesPath, 'icon.png')
-  : path.join(__dirname, '../../resources/icon.png');
+const WINDOW_ICON = getAppIconPath();
 const WINDOW_CHROME =
   process.platform === 'darwin'
     ? {
@@ -28,6 +27,34 @@ const FALLBACK_WINDOW_STATE: WindowStateSettings = DEFAULT_WINDOW_STATE;
 
 let mainWindow: BrowserWindow | null = null;
 let pendingMainWindow: Promise<BrowserWindow> | null = null;
+let closeToTrayEnabled = true;
+let appQuitting = false;
+let closeToTrayHandler: (() => void) | null = null;
+let visibilityHandler: (() => void) | null = null;
+
+export function setCloseToTrayEnabled(enabled: boolean): void {
+  closeToTrayEnabled = enabled;
+}
+
+export function isCloseToTrayEnabled(): boolean {
+  return closeToTrayEnabled;
+}
+
+export function markAppQuitting(): void {
+  appQuitting = true;
+}
+
+export function isAppQuitting(): boolean {
+  return appQuitting;
+}
+
+export function setCloseToTrayHandler(handler: (() => void) | null): void {
+  closeToTrayHandler = handler;
+}
+
+export function setWindowVisibilityHandler(handler: (() => void) | null): void {
+  visibilityHandler = handler;
+}
 
 function openExternalLink(rawUrl: string): void {
   try {
@@ -190,8 +217,24 @@ function bindWindowPersistence(browserWindow: BrowserWindow): void {
   browserWindow.on('resize', scheduleSave);
   browserWindow.on('maximize', scheduleSave);
   browserWindow.on('unmaximize', scheduleSave);
+  browserWindow.on('show', () => {
+    visibilityHandler?.();
+  });
+  browserWindow.on('hide', () => {
+    clearSaveTimer();
+    void persist();
+    visibilityHandler?.();
+  });
   browserWindow.on('close', (event) => {
     if (isClosing) {
+      return;
+    }
+
+    if (!appQuitting && closeToTrayEnabled) {
+      event.preventDefault();
+      clearSaveTimer();
+      browserWindow.hide();
+      closeToTrayHandler?.();
       return;
     }
 
@@ -235,7 +278,7 @@ async function loadRenderer(browserWindow: BrowserWindow): Promise<void> {
   );
 }
 
-async function buildMainWindow(): Promise<BrowserWindow> {
+async function buildMainWindow(hidden: boolean): Promise<BrowserWindow> {
   const storedState = await getWindowState().catch(() => null);
   const state = storedState ?? FALLBACK_WINDOW_STATE;
   const { displays, primary } = getDisplaySnapshot();
@@ -269,30 +312,35 @@ async function buildMainWindow(): Promise<BrowserWindow> {
     browserWindow.maximize();
   }
 
-  browserWindow.once('ready-to-show', () => {
-    browserWindow.show();
-
-    // Hidden windows can report a different frame compensation than visible
-    // ones. Re-apply the target after showing so the first persisted state is
-    // already the final size instead of one pixel off.
-    if (!state.maximized) {
-      setExactWindowBounds(browserWindow, bounds);
-
-      // The first show can trigger one more native frame adjustment after the
-      // current task. Re-check shortly after showing so the initial settings
-      // readout and the first persisted state match the requested size.
-      setTimeout(() => {
-        if (
-          !browserWindow.isDestroyed() &&
-          !browserWindow.isMaximized() &&
-          !browserWindow.isFullScreen()
-        ) {
-          setExactWindowBounds(browserWindow, bounds);
-        }
-      }, 50);
+  let adjustedAfterShow = false;
+  browserWindow.once('show', () => {
+    if (adjustedAfterShow || state.maximized) {
+      return;
     }
 
-    if (!app.isPackaged) {
+    adjustedAfterShow = true;
+    setExactWindowBounds(browserWindow, bounds);
+
+    // The first show can trigger one more native frame adjustment after the
+    // current task. Re-check shortly after showing so the first persisted
+    // state matches the requested size.
+    setTimeout(() => {
+      if (
+        !browserWindow.isDestroyed() &&
+        !browserWindow.isMaximized() &&
+        !browserWindow.isFullScreen()
+      ) {
+        setExactWindowBounds(browserWindow, bounds);
+      }
+    }, 50);
+  });
+
+  browserWindow.once('ready-to-show', () => {
+    if (!hidden) {
+      browserWindow.show();
+    }
+
+    if (!app.isPackaged && !hidden) {
       // Detached DevTools keeps the custom window chrome at its real size.
       browserWindow.webContents.openDevTools({ mode: 'detach' });
     }
@@ -311,14 +359,19 @@ async function buildMainWindow(): Promise<BrowserWindow> {
   return browserWindow;
 }
 
-export function createMainWindow(): Promise<BrowserWindow> {
+interface CreateMainWindowOptions {
+  readonly hidden?: boolean;
+}
+
+export function createMainWindow(
+  options: CreateMainWindowOptions = {},
+): Promise<BrowserWindow> {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    focusMainWindow();
     return Promise.resolve(mainWindow);
   }
 
   if (!pendingMainWindow) {
-    pendingMainWindow = buildMainWindow().finally(() => {
+    pendingMainWindow = buildMainWindow(options.hidden ?? false).finally(() => {
       pendingMainWindow = null;
     });
   }
@@ -326,17 +379,44 @@ export function createMainWindow(): Promise<BrowserWindow> {
   return pendingMainWindow;
 }
 
-export function focusMainWindow(): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
+export async function showMainWindow(): Promise<void> {
+  const browserWindow = await createMainWindow();
+
+  if (browserWindow.isMinimized()) {
+    browserWindow.restore();
+  }
+
+  browserWindow.show();
+  browserWindow.focus();
+}
+
+export function hideMainWindow(): void {
+  const browserWindow = getMainWindow();
+
+  if (browserWindow?.isVisible()) {
+    browserWindow.hide();
+  }
+}
+
+export function navigateMainWindow(page: AppNavigationTarget): void {
+  const browserWindow = getMainWindow();
+
+  if (!browserWindow) {
     return;
   }
 
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
+  const send = () => {
+    if (!browserWindow.isDestroyed()) {
+      browserWindow.webContents.send(IpcChannel.AppNavigate, page);
+    }
+  };
+
+  if (browserWindow.webContents.isLoading()) {
+    browserWindow.webContents.once('did-finish-load', send);
+    return;
   }
 
-  mainWindow.show();
-  mainWindow.focus();
+  send();
 }
 
 export function getMainWindow(): BrowserWindow | null {

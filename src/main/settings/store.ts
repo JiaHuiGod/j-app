@@ -14,12 +14,14 @@ import type { ThemePreference } from '@shared/appearance';
 import type { SiteConnection } from '@shared/connections';
 import type {
   AppSettings,
+  DesktopSettings,
   ProxySettings,
   WindowStateSettings,
 } from '@shared/settings';
 import { createDefaultAppSettings } from './defaults';
 import {
   parseAppSettings,
+  parseDesktopBehaviorUpdate,
   parseProxySettings,
   parseWindowState,
 } from './schema';
@@ -181,6 +183,46 @@ export async function saveWindowState(
   }));
 
   return windowState;
+}
+
+export async function getDesktopSettings(): Promise<DesktopSettings> {
+  return (await loadSettings()).desktop;
+}
+
+export async function saveDesktopBehavior(
+  input: unknown,
+): Promise<DesktopSettings> {
+  const behavior = parseDesktopBehaviorUpdate(input);
+
+  let nextSettings: DesktopSettings | null = null;
+
+  await updateSettings((current) => {
+    nextSettings = {
+      ...current.desktop,
+      ...behavior,
+    };
+
+    return {
+      ...current,
+      desktop: nextSettings,
+    };
+  });
+
+  if (!nextSettings) {
+    throw new Error('无法保存启动与后台设置。');
+  }
+
+  return nextSettings;
+}
+
+export async function markTrayTipShown(): Promise<void> {
+  await updateSettings((current) => ({
+    ...current,
+    desktop: {
+      ...current.desktop,
+      trayTipShown: true,
+    },
+  }));
 }
 
 export async function saveProxySettings(

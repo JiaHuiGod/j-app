@@ -31,6 +31,33 @@ export const DEFAULT_WINDOW_STATE: WindowStateSettings = {
   maximized: false,
 };
 
+export interface DesktopSettings {
+  readonly closeToTray: boolean;
+  readonly startAtLogin: boolean;
+  readonly startHidden: boolean;
+  readonly trayTipShown: boolean;
+}
+
+export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+  closeToTray: true,
+  startAtLogin: false,
+  startHidden: true,
+  trayTipShown: false,
+};
+
+export interface DesktopBehaviorState {
+  readonly closeToTray: boolean;
+  readonly startAtLogin: boolean;
+  readonly startHidden: boolean;
+  readonly canAutoStart: boolean;
+}
+
+export interface DesktopBehaviorUpdate {
+  readonly closeToTray: boolean;
+  readonly startAtLogin: boolean;
+  readonly startHidden: boolean;
+}
+
 export interface AppSettings {
   readonly schemaVersion: 3;
   readonly network: {
@@ -52,6 +79,7 @@ export interface AppSettings {
     readonly directories: readonly string[];
   };
   readonly windowState: WindowStateSettings;
+  readonly desktop: DesktopSettings;
 }
 
 export type ProxyTestTargetId = 'google' | 'github';

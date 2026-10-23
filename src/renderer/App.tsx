@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ThemePreference } from '@shared/appearance';
 import type { ProxySettings } from '@shared/settings';
 import { ProxyDialog } from './components/ProxyDialog';
@@ -41,7 +41,7 @@ function App() {
     };
   }, []);
 
-  const handleNavigate = (page: AppPage) => {
+  const handleNavigate = useCallback((page: AppPage) => {
     setActivePage(page);
 
     if (page === 'drive') {
@@ -55,7 +55,11 @@ function App() {
     if (appShellRef.current) {
       appShellRef.current.scrollTop = 0;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    return window.desktop.onNavigate(handleNavigate);
+  }, [handleNavigate]);
 
   const handleProxySaved = (proxy: ProxySettings) => {
     setProxyEnabled(proxy.enabled);

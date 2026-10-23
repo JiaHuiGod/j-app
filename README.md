@@ -129,12 +129,15 @@ j-app/
 │  │  │  ├─ schema.ts           # Zod 配置校验与版本迁移
 │  │  │  ├─ schema.test.ts      # 配置校验测试
 │  │  │  └─ store.ts            # 单文件配置仓库、原子写入与坏文件恢复
-│  │  ├─ index.ts               # 应用生命周期、单实例、启动流程
-│  │  ├─ dev-user-data.ts      # 开发环境独立 userData 与一次性迁移
-│  │  ├─ ipc.ts                # ipcMain 处理器
-│  │  ├─ security.ts           # CSP 与 webview 防护
-│  │  ├─ window-state.ts        # 窗口尺寸校验、多显示器回退
-│  │  └─ window.ts              # BrowserWindow、导航、外链与窗口状态持久化
+│  │  ├─ app-icon.ts          # 窗口、托盘与通知共用的应用图标路径
+│  │  ├─ desktop-behavior.ts  # 托盘关闭、开机自启与启动隐藏策略
+│  │  ├─ dev-user-data.ts     # 开发环境独立 userData 与一次性迁移
+│  │  ├─ index.ts             # 应用生命周期、单实例、启动流程
+│  │  ├─ ipc.ts               # ipcMain 处理器
+│  │  ├─ security.ts          # CSP 与 webview 防护
+│  │  ├─ tray.ts              # 托盘图标、菜单与快捷入口
+│  │  ├─ window-state.ts      # 窗口尺寸校验、多显示器回退
+│  │  └─ window.ts            # BrowserWindow、导航、外链与窗口状态持久化
 │  ├─ preload/                  # 预加载：受控 API 边界
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
@@ -295,6 +298,29 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 - 下次启动时校验保存位置是否仍在当前显示器工作区内，显示器移除或分辨率变化时回退到主屏居中；
 - 设置页不提供窗口尺寸修改或重置入口，窗口状态完全由用户实际调整自动维护；
 - 纯边界计算位于 [`src/main/window-state.ts`](src/main/window-state.ts)，窗口生命周期和 IPC 位于 [`src/main/window.ts`](src/main/window.ts)。
+
+## 托盘与后台运行
+
+默认关闭窗口不会退出应用，而是隐藏到系统托盘；从托盘可以重新显示、打开本地视频、打开设置或真正退出。托盘逻辑位于 [`src/main/tray.ts`](src/main/tray.ts)，关闭行为、开机自启和启动时是否显示的逻辑位于 [`src/main/desktop-behavior.ts`](src/main/desktop-behavior.ts)。
+
+设置页的“启动与后台”提供：
+
+- **关闭窗口时最小化到托盘**（默认开启）
+- **开机自动启动**（仅安装后的 Windows / macOS 版本）
+- **自启动时隐藏到托盘**
+
+实现约定：
+
+- 关闭到托盘只隐藏窗口，不销毁渲染进程，因此上传、下载和播放状态不会中断；
+- 关闭到托盘前会保存窗口状态，托盘恢复时保留原尺寸、位置和最大化状态；
+- 第一次关闭到托盘会发送一次系统通知，提示应用仍在后台；
+- 托盘菜单提供显示/隐藏、打开本地视频、打开设置和退出 J App；
+- 只有托盘退出、关闭“关闭到托盘”后关闭窗口、系统关机/注销等真正退出路径才会结束进程；
+- Windows 开机自启使用 `--hidden` 参数，登录后直接进入托盘；开发环境禁用开机自启动，避免注册 Electron 开发程序；
+- macOS 使用系统登录项，并通过 `wasOpenedAtLogin` 配合“自启动时隐藏”决定是否显示窗口；
+- 不实现 Linux 开机自启和后台运行支持。
+
+窗口隐藏/恢复、托盘菜单刷新和单实例唤醒之间的协作集中在 [`src/main/window.ts`](src/main/window.ts) 与 [`src/main/index.ts`](src/main/index.ts)。
 
 ## 主导航与页面
 

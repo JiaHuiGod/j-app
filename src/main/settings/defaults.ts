@@ -1,5 +1,8 @@
 import type { AppSettings, ProxySettings } from '@shared/settings';
-import { DEFAULT_WINDOW_STATE } from '@shared/settings';
+import {
+  DEFAULT_DESKTOP_SETTINGS,
+  DEFAULT_WINDOW_STATE,
+} from '@shared/settings';
 
 export const DEFAULT_PROXY_SETTINGS: ProxySettings = {
   enabled: false,
@@ -29,6 +32,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     directories: [],
   },
   windowState: DEFAULT_WINDOW_STATE,
+  desktop: DEFAULT_DESKTOP_SETTINGS,
 };
 
 export function createDefaultAppSettings(): AppSettings {
