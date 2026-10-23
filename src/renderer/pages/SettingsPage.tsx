@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SiteConnectionSummary } from '@shared/connections';
+import type {
+  ClearAllSiteConnectionsResult,
+  SiteConnectionSummary,
+} from '@shared/connections';
 import { AddSiteDialog } from '../components/AddSiteDialog';
 import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { DownloadSettings } from '../components/DownloadSettings';
@@ -61,6 +64,23 @@ function LockIcon() {
   );
 }
 
+function PinIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      focusable="false"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.4"
+      viewBox="0 0 16 16"
+    >
+      <path d="M6 2.5h4l-.6 3.5 2.1 2v1.2H8.6v4L8 14l-.6-.8v-4H4.5V8l2.1-2L6 2.5Z" />
+    </svg>
+  );
+}
+
 interface SettingsPageProps {
   readonly appearance: AppearanceController;
 }
@@ -74,11 +94,13 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
   const [isClearAllOpen, setIsClearAllOpen] = useState(false);
   const [loggingInId, setLoggingInId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [pinningId, setPinningId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const isMountedRef = useRef(true);
 
-  const isBusy = loggingInId !== null || removingId !== null;
+  const isBusy =
+    loggingInId !== null || removingId !== null || pinningId !== null;
 
   const loadConnections = useCallback(async () => {
     setIsLoading(true);
@@ -143,6 +165,38 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
     }
   };
 
+  const handleTogglePinned = async (connection: SiteConnectionSummary) => {
+    if (isBusy) {
+      return;
+    }
+
+    setPinningId(connection.id);
+    setError('');
+
+    try {
+      const updated = await window.desktop.connections.setPinned({
+        connectionId: connection.id,
+        pinned: !connection.pinned,
+      });
+
+      if (isMountedRef.current) {
+        setConnections((current) =>
+          current.map((item) => (item.id === updated.id ? updated : item)),
+        );
+      }
+    } catch (pinFailure: unknown) {
+      if (isMountedRef.current) {
+        setError(
+          toErrorMessage(pinFailure, '更新站点固定状态失败，请稍后重试。'),
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setPinningId(null);
+      }
+    }
+  };
+
   const handleRemove = async (connection: SiteConnectionSummary) => {
     if (isBusy) {
       return;
@@ -152,17 +206,32 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
     setError('');
 
     try {
-      await window.desktop.connections.remove(connection.id);
+      const result = await window.desktop.connections.remove(connection.id);
 
       if (isMountedRef.current) {
-        setConnections((current) =>
-          current.filter((item) => item.id !== connection.id),
-        );
+        if (result.removed) {
+          setConnections((current) =>
+            current.filter((item) => item.id !== connection.id),
+          );
+        } else if (result.connection) {
+          const updated = result.connection;
+          setConnections((current) =>
+            current.map((item) => (item.id === updated.id ? updated : item)),
+          );
+        }
+
         setConfirmingId(null);
       }
     } catch (removeFailure: unknown) {
       if (isMountedRef.current) {
-        setError(toErrorMessage(removeFailure, '移除站点失败，请稍后重试。'));
+        setError(
+          toErrorMessage(
+            removeFailure,
+            connection.pinned
+              ? '清除站点 Cookie 失败，请稍后重试。'
+              : '移除站点失败，请稍后重试。',
+          ),
+        );
       }
     } finally {
       if (isMountedRef.current) {
@@ -171,12 +240,17 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
     }
   };
 
-  const handleAllCleared = () => {
-    setConnections([]);
+  const handleAllCleared = (result: ClearAllSiteConnectionsResult) => {
+    setConnections(result.remaining);
     setConfirmingId(null);
     setLoggingInId(null);
+    setPinningId(null);
     setError('');
   };
+
+  const pinnedCount = connections.filter(
+    (connection) => connection.pinned,
+  ).length;
 
   return (
     <main className={styles.page} aria-labelledby="settings-page-title">
@@ -244,6 +318,7 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
             <p>
               每个站点都会增加独立的 Cookie、缓存和持久会话开销，而 Electron
               本身有较高的内存占用。请只添加确实需要的站点，并在不再使用时及时移除。
+              固定的站点在移除或清理全部时只清除 Cookie，保留在列表中。
             </p>
           </div>
         </aside>
@@ -292,6 +367,7 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
               const isConfirming = confirmingId === connection.id;
               const isLoggingIn = loggingInId === connection.id;
               const isRemoving = removingId === connection.id;
+              const isPinning = pinningId === connection.id;
 
               return (
                 <li className={styles.row} key={connection.id}>
@@ -308,6 +384,9 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
                         <span aria-hidden="true" />
                         {isConnected ? '已保存' : '待登录'}
                       </span>
+                      {connection.pinned && (
+                        <span className={styles.pinnedBadge}>已固定</span>
+                      )}
                     </div>
                     <span className={styles.url} title={connection.loginUrl}>
                       {connection.loginUrl}
@@ -342,11 +421,45 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
                             void handleRemove(connection);
                           }}
                         >
-                          {isRemoving ? '移除中…' : '确认移除'}
+                          {isRemoving
+                            ? connection.pinned
+                              ? '清除中…'
+                              : '移除中…'
+                            : connection.pinned
+                              ? '确认清除'
+                              : '确认移除'}
                         </button>
                       </>
                     ) : (
                       <>
+                        <button
+                          aria-label={
+                            connection.pinned
+                              ? `取消固定 ${connection.name}`
+                              : `固定 ${connection.name}`
+                          }
+                          aria-pressed={connection.pinned}
+                          className={`${styles.action} ${styles.pinAction}${
+                            connection.pinned
+                              ? ` ${styles.pinActionActive}`
+                              : ''
+                          }`}
+                          disabled={isBusy}
+                          title={connection.pinned ? '取消固定' : '固定站点'}
+                          type="button"
+                          onClick={() => {
+                            void handleTogglePinned(connection);
+                          }}
+                        >
+                          <PinIcon />
+                          <span>
+                            {isPinning
+                              ? '更新中…'
+                              : connection.pinned
+                                ? '取消固定'
+                                : '固定'}
+                          </span>
+                        </button>
                         <button
                           className={styles.action}
                           disabled={isBusy}
@@ -369,7 +482,7 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
                             setConfirmingId(connection.id);
                           }}
                         >
-                          移除
+                          {connection.pinned ? '清除 Cookie' : '移除'}
                         </button>
                       </>
                     )}
@@ -395,8 +508,8 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
             <div>
               <strong>清理全部站点数据</strong>
               <p>
-                删除所有站点连接、Cookie
-                和本地缓存。网络代理与界面设置不受影响。
+                删除未固定站点连接和全部 Cookie；固定站点只清除 Cookie、缓存，
+                保留在列表中。网络代理与界面设置不受影响。
               </p>
             </div>
             <button
@@ -428,6 +541,7 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
       {isClearAllOpen && (
         <ClearAllSitesDialog
           connectionCount={connections.length}
+          pinnedCount={pinnedCount}
           onCleared={handleAllCleared}
           onClose={() => {
             setIsClearAllOpen(false);

@@ -5,7 +5,10 @@ import {
   type IpcRendererEvent,
 } from 'electron';
 import type { ThemePreference } from '@shared/appearance';
-import type { CreateSiteConnectionInput } from '@shared/connections';
+import type {
+  CreateSiteConnectionInput,
+  SetSiteConnectionPinnedInput,
+} from '@shared/connections';
 import type {
   DriveCreateFolderInput,
   DriveDeleteInput,
@@ -99,6 +102,9 @@ const connections = Object.freeze<ConnectionsApi>({
   },
   login: (connectionId: string) => {
     return ipcRenderer.invoke(IpcChannel.LoginSiteConnection, connectionId);
+  },
+  setPinned: (input: SetSiteConnectionPinnedInput) => {
+    return ipcRenderer.invoke(IpcChannel.SetSiteConnectionPinned, input);
   },
   remove: (connectionId: string) => {
     return ipcRenderer.invoke(IpcChannel.RemoveSiteConnection, connectionId);

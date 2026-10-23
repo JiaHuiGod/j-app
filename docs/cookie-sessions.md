@@ -10,7 +10,8 @@
 - Cookie 由 Electron/Chromium 的持久 Session 保存，不写入应用配置、不返回 React 渲染层；
 - 支持多个站点、同一站点的多个账号；
 - 登录窗口和未来抓取任务复用当前网络代理；
-- 设置页提示多站点资源开销，支持单站点移除和清理全部站点数据；
+- 设置页提示多站点资源开销，支持固定站点、单站点移除和清理全部站点数据；
+- 固定站点在执行移除或清理全部时只清除 Cookie/缓存，保留配置中的列表条目；
 - 应用启动时自动删除无主站点 partition；
 - 站点 Session 使用标准桌面 Chrome UA 和语言头，降低普通网站误判 Electron 客户端的情况；
 - 可随时重新登录或删除会话。
@@ -88,7 +89,8 @@ Main
         "name": "GitHub",
         "loginUrl": "https://github.com/login",
         "createdAt": "2026-10-21T02:00:00.000Z",
-        "lastLoginAt": "2026-10-21T02:10:00.000Z"
+        "lastLoginAt": "2026-10-21T02:10:00.000Z",
+        "pinned": true
       }
     ]
   },
@@ -194,7 +196,10 @@ Chromium Partition  → Cookie 本体
 - Cookie 不会在连接之间共享；
 - 连接名称可重复，但 ID 唯一；
 - 同一时间只允许一个登录窗口，避免并发登录写入混乱；
-- 移除连接会清除对应 partition 的 Cookie、localStorage、IndexedDB、CacheStorage、Service Worker 和缓存，然后删除元数据。
+- 站点可以固定；固定状态保存在 `settings.json` 的 `connections.sites[].pinned`；
+- 未固定站点移除时清除对应 partition 的 Cookie、localStorage、IndexedDB、CacheStorage、Service Worker 和缓存，然后删除元数据；
+- 固定站点移除时执行相同的存储清理，但保留元数据和列表条目，状态变为“待登录”；
+- 取消固定后按普通站点处理。
 
 ### 5.1 资源占用提示
 
@@ -212,11 +217,12 @@ Chromium Partition  → Cookie 本体
 入口位于站点卡片底部：
 
 1. 点击“清理全部”；
-2. 二次确认弹窗显示受影响站点数量、Cookie/缓存影响范围和不可撤销提示；
+2. 二次确认弹窗显示站点数量、固定站点数量、Cookie/缓存影响范围；
 3. 确认后主进程逐个清空所有连接存储；
-4. 只有全部存储操作成功后，才删除 `settings.connections.sites`；
-5. 任意一个清理失败都会保留元数据，方便用户重试，避免出现无法在 UI 中管理的数据；
-6. 渲染层清空列表并显示空状态。
+4. 只有全部存储操作成功后，才删除未固定站点元数据；
+5. 固定站点保留元数据和列表条目，状态变为“待登录”；
+6. 任意一个清理失败都会保留元数据，方便用户重试，避免出现无法在 UI 中管理的数据；
+7. 渲染层更新剩余固定站点列表；如果没有固定站点则显示空状态。
 
 “清理全部”只删除站点连接数据，不影响代理、界面和其他应用设置。
 
@@ -238,7 +244,7 @@ Chromium Partition  → Cookie 本体
 - `settings.json` 损坏并被重置后，旧连接元数据消失；
 - 清理全部后留下的空目录。
 
-注意：清理全部站点数据后，partition 目录可能立即保留为空目录，应用重启时才会被一并删除。
+注意：清理全部站点数据后，未固定站点的 partition 目录可能立即保留为空目录，应用重启时才会被一并删除；固定站点的 partition 因元数据仍保留而不会被回收。
 
 ### 5.4 站点访问兼容性
 
@@ -317,6 +323,7 @@ ListSiteConnections: 'connections:list',
 CreateSiteConnection: 'connections:create',
 CreateSitePreset: 'connections:create-preset',
 LoginSiteConnection: 'connections:login',
+SetSiteConnectionPinned: 'connections:set-pinned',
 RemoveSiteConnection: 'connections:remove',
 ClearSiteConnections: 'connections:clear-all',
 ```
@@ -331,10 +338,22 @@ interface ConnectionsApi {
     input: CreateSiteConnectionInput,
   ): Promise<SiteConnectionSummary>;
   login(connectionId: string): Promise<SiteConnectionSummary>;
-  remove(connectionId: string): Promise<void>;
-  clearAll(): Promise<number>;
+  setPinned(input: {
+    connectionId: string;
+    pinned: boolean;
+  }): Promise<SiteConnectionSummary>;
+  remove(connectionId: string): Promise<{
+    removed: boolean;
+    connection: SiteConnectionSummary | null;
+  }>;
+  clearAll(): Promise<{
+    clearedCount: number;
+    remaining: readonly SiteConnectionSummary[];
+  }>;
 }
 ```
+
+`remove()` 对固定站点返回 `{ removed: false, connection: 清理后的摘要 }`，对普通站点返回 `{ removed: true, connection: null }`。
 
 摘要类型：
 
@@ -345,6 +364,7 @@ interface SiteConnectionSummary {
   loginUrl: string;
   createdAt: string;
   lastLoginAt: string | null;
+  pinned: boolean;
   cookieCount: number;
   status: 'connected' | 'empty';
 }
@@ -357,6 +377,7 @@ interface SiteConnectionSummary {
 - v1 中的 `network.proxy` 保留；
 - 自动增加 `connections.sites = []`；
 - v2 中已有的站点连接保留；
+- 所有旧版本自动补充 `pinned = false`；
 - 所有旧版本自动补充 `appearance.theme = "system"`；
 - 启动时完成校验并写回 v3；
 - 无效配置仍按既有策略备份为 `settings.invalid-<timestamp>.json`。
@@ -365,19 +386,20 @@ interface SiteConnectionSummary {
 
 ## 10. 状态、失败与清理
 
-| 场景                  | 行为                                                                   |
-| --------------------- | ---------------------------------------------------------------------- |
-| 仅保存站点            | 只写元数据，不创建登录窗口；列表显示“待登录”                           |
-| 登录窗口内没有 Cookie | 新建不保存，旧连接保留并提示失败                                       |
-| 用户提前关闭登录窗口  | 与“没有 Cookie”相同                                                    |
-| 添加站点失败          | 清理新建的临时 partition                                               |
-| 重新登录失败          | 不删除原连接和已有 Cookie                                              |
-| 登录窗口已存在        | 拒绝第二个登录窗口                                                     |
-| 删除站点              | 清空 partition 数据后删除元数据                                        |
-| 清理全部站点数据      | 清空所有 partition 后删除所有元数据；空目录在下次启动时回收            |
-| 清理中途失败          | 保留元数据，用户可重试；已清空的连接会显示待登录状态                   |
-| 启动时无主分区        | 删除没有连接元数据的 `japp-site-<uuid>` 分区                           |
-| Cookie 过期           | 状态仍可能显示“已保存”，以 Cookie 数量为准；需要重新登录或后续验证策略 |
+| 场景                  | 行为                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| 仅保存站点            | 只写元数据，不创建登录窗口；列表显示“待登录”                             |
+| 登录窗口内没有 Cookie | 新建不保存，旧连接保留并提示失败                                         |
+| 用户提前关闭登录窗口  | 与“没有 Cookie”相同                                                      |
+| 添加站点失败          | 清理新建的临时 partition                                                 |
+| 重新登录失败          | 不删除原连接和已有 Cookie                                                |
+| 登录窗口已存在        | 拒绝第二个登录窗口                                                       |
+| 删除站点              | 清空 partition 数据后删除元数据；固定站点保留元数据并显示待登录          |
+| 固定/取消固定         | 只更新 `pinned`，不清理 Cookie 或会话数据                                |
+| 清理全部站点数据      | 清空所有 partition；删除未固定元数据，保留固定元数据；空目录下次启动回收 |
+| 清理中途失败          | 保留元数据，用户可重试；已清空的连接会显示待登录状态                     |
+| 启动时无主分区        | 删除没有连接元数据的 `japp-site-<uuid>` 分区                             |
+| Cookie 过期           | 状态仍可能显示“已保存”，以 Cookie 数量为准；需要重新登录或后续验证策略   |
 
 当前只以 Cookie 数量判断 `connected`，**不代表登录态一定仍有效**。后续接入具体站点时，可以增加 provider adapter 做轻量鉴权请求验证。
 
@@ -387,7 +409,7 @@ interface SiteConnectionSummary {
 - 登录窗口与主应用隔离，无 preload/Node；
 - 每个站点、每个账号使用独立分区，减少跨站点泄露；
 - 登录窗口只允许 HTTPS，本地 HTTP 仅限回环地址；
-- 删除连接和清理全部都会主动清空站点存储；
+- 删除连接和清理全部都会主动清空站点存储；固定站点保留元数据但清除登录态；
 - 启动时自动删除无连接元数据的站点分区，避免配置损坏后留下无法管理的 Cookie；
 - 不保存账号密码；用户直接在被托管的登录窗口中输入凭据；
 - 站点 Session 使用标准 Chrome UA 仅解决兼容性问题，不用于绕过访问控制；
@@ -424,11 +446,14 @@ interface SiteConnectionSummary {
 - 重新登录会打开相同 partition，更新 `lastLoginAt`，Cookie 数量保持正确；
 - 移除连接后元数据被删除，对应 partition 的 Cookies 表清空，另一连接不受影响；
 - 设置页显示资源占用警告，清理全部入口只在有站点时出现；
-- 清理全部站点数据后，所有连接元数据清空、Cookies 表清空，并显示空状态；
+- 固定站点显示“已固定”，固定状态写入 `settings.json`；
+- 固定站点点击“清除 Cookie”后保留列表并显示“待登录”，未固定站点移除后从列表消失；
+- 清理全部后未固定连接元数据删除，固定连接保留且只清空 Cookie；
+- Vitest 覆盖添加、仅保存站点、列表、重新登录、固定/取消固定、固定站点清理、移除、清理全部和渲染层资源提示；
+- 当前总测试数 115；
 - 启动时保留有元数据的 partition、删除伪造的无主 partition，并保留不符合命名规则的目录；
 - 登录窗口 User-Agent 为标准桌面 Chrome UA，不包含 `Electron`；请求语言头为中文优先；
 - 在 900×620 视口下设置页无横向溢出；
-- Vitest 覆盖添加、仅保存站点、列表、重新登录、移除、清理全部和渲染层资源提示；
 - 打包运行期间无渲染层异常或控制台错误。
 
 本地开发验证可以使用回环 HTTP 服务返回：

@@ -172,7 +172,7 @@ Electron 的 `nativeTheme.themeSource` 会同步影响渲染进程的 `prefers-c
 - Vitest 覆盖主题选择交互、配置迁移和主题值校验；
 - 打包应用无渲染层异常或控制台错误。
 
-当前测试总数为 111 个，`pnpm check` 全部通过。
+当前测试总数为 115 个，`pnpm check` 全部通过。
 
 ## 8. 已知限制
 

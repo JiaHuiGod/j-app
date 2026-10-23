@@ -397,6 +397,37 @@ export async function updateSiteConnectionLoginAt(
   return updatedConnection;
 }
 
+export async function setSiteConnectionPinned(
+  id: string,
+  pinned: boolean,
+): Promise<SiteConnection> {
+  let updatedConnection: SiteConnection | null = null;
+
+  await updateSettings((current) => ({
+    ...current,
+    connections: {
+      sites: current.connections.sites.map((connection) => {
+        if (connection.id !== id) {
+          return connection;
+        }
+
+        updatedConnection = {
+          ...connection,
+          pinned,
+        };
+
+        return updatedConnection;
+      }),
+    },
+  }));
+
+  if (!updatedConnection) {
+    throw new Error('站点连接不存在。');
+  }
+
+  return updatedConnection;
+}
+
 export async function removeSiteConnection(
   id: string,
 ): Promise<SiteConnection> {
@@ -423,18 +454,25 @@ export async function removeSiteConnection(
   return removedConnection;
 }
 
-export async function removeAllSiteConnections(): Promise<
+export async function removeUnpinnedSiteConnections(): Promise<
   readonly SiteConnection[]
 > {
-  let removedConnections: readonly SiteConnection[] = [];
+  let removedConnections: SiteConnection[] = [];
 
   await updateSettings((current) => {
-    removedConnections = current.connections.sites;
+    const retained = current.connections.sites.filter((connection) => {
+      if (connection.pinned) {
+        return true;
+      }
+
+      removedConnections = [...removedConnections, connection];
+      return false;
+    });
 
     return {
       ...current,
       connections: {
-        sites: [],
+        sites: retained,
       },
     };
   });

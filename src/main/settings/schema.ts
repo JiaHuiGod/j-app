@@ -86,6 +86,7 @@ const siteConnectionSchema = z.object({
   }),
   createdAt: z.string(),
   lastLoginAt: z.string().nullable(),
+  pinned: z.boolean().default(false),
 });
 
 const connectionsSchema = z

@@ -99,7 +99,34 @@ describe('application settings migration', () => {
 
     expect(settings.schemaVersion).toBe(3);
     expect(settings.connections.sites).toHaveLength(1);
+    expect(settings.connections.sites[0]?.pinned).toBe(false);
     expect(settings.appearance.theme).toBe('system');
+  });
+
+  it('preserves pinned site connections', () => {
+    const settings = parseAppSettings({
+      schemaVersion: 3,
+      network: {
+        proxy: disabledProxy,
+      },
+      connections: {
+        sites: [
+          {
+            id: '0f2a63a7-0a9f-4b0a-9d0b-6b8e1c1a2f5d',
+            name: 'GitHub',
+            loginUrl: 'https://github.com/login',
+            createdAt: '2026-10-21T02:00:00.000Z',
+            lastLoginAt: null,
+            pinned: true,
+          },
+        ],
+      },
+      appearance: {
+        theme: 'system',
+      },
+    });
+
+    expect(settings.connections.sites[0]?.pinned).toBe(true);
   });
 
   it('accepts version 3 theme preferences', () => {

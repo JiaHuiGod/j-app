@@ -115,7 +115,7 @@
 }
 
 .warning p {
-  max-width: 860px;
+  /* max-width: 860px; */
   margin: 3px 0 0;
 }
 
@@ -390,6 +390,46 @@
   background: rgb(23 25 31 / 5%);
 }
 
+.pinAction {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 7px;
+  color: var(--muted);
+}
+
+.pinAction svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.pinActionActive {
+  color: var(--blue);
+  background: rgb(33 72 255 / 8%);
+  border-color: rgb(33 72 255 / 26%);
+}
+
+.pinActionActive svg {
+  fill: currentColor;
+}
+
+.pinnedBadge {
+  padding: 2px 6px;
+  color: var(--blue);
+  font-size: 0.55rem;
+  font-weight: 600;
+  background: rgb(33 72 255 / 8%);
+  border: 1px solid rgb(33 72 255 / 20%);
+  border-radius: 999px;
+}
+
 .actionDanger {
   color: var(--surface);
   background: var(--danger);
@@ -549,6 +589,18 @@
 
   .actionQuiet:hover:not(:disabled) {
     background: rgb(255 255 255 / 7%);
+  }
+
+  .pinActionActive {
+    color: #a9bbff;
+    background: rgb(100 130 255 / 16%);
+    border-color: rgb(100 130 255 / 36%);
+  }
+
+  .pinnedBadge {
+    color: #a9bbff;
+    background: rgb(100 130 255 / 12%);
+    border-color: rgb(100 130 255 / 28%);
   }
 
   .actionDanger {

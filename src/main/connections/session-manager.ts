@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { BrowserWindow, session, type Session } from 'electron';
 import type {
+  ClearAllSiteConnectionsResult,
   CreateSiteConnectionInput,
+  RemoveSiteConnectionResult,
   SiteConnection,
   SiteConnectionSummary,
 } from '@shared/connections';
@@ -12,8 +14,9 @@ import {
   findSiteConnection,
   getProxySettings,
   getSiteConnections,
-  removeAllSiteConnections,
   removeSiteConnection,
+  removeUnpinnedSiteConnections,
+  setSiteConnectionPinned,
   updateSiteConnectionLoginAt,
 } from '../settings/store';
 import {
@@ -189,6 +192,7 @@ function buildDraftConnection(
     loginUrl: input.loginUrl,
     createdAt: now,
     lastLoginAt: null,
+    pinned: false,
   };
 }
 
@@ -300,7 +304,9 @@ export async function loginSiteConnection(
   return loginAndSummarize(connection, false);
 }
 
-export async function removeSiteConnectionData(input: unknown): Promise<void> {
+export async function removeSiteConnectionData(
+  input: unknown,
+): Promise<RemoveSiteConnectionResult> {
   const connectionId = parseSiteConnectionId(input);
   const connection = await findSiteConnection(connectionId);
 
@@ -309,10 +315,23 @@ export async function removeSiteConnectionData(input: unknown): Promise<void> {
   }
 
   await clearConnectionStorage(connection.id);
+
+  if (connection.pinned) {
+    return {
+      removed: false,
+      connection: summarizeConnection(connection, 0),
+    };
+  }
+
   await removeSiteConnection(connection.id);
+
+  return {
+    removed: true,
+    connection: null,
+  };
 }
 
-export async function clearAllSiteConnectionData(): Promise<number> {
+export async function clearAllSiteConnectionData(): Promise<ClearAllSiteConnectionsResult> {
   if (loginWindow) {
     throw new Error('请先完成或关闭当前登录窗口，再清理全部站点数据。');
   }
@@ -320,18 +339,46 @@ export async function clearAllSiteConnectionData(): Promise<number> {
   const connections = await getSiteConnections();
 
   if (connections.length === 0) {
-    return 0;
+    return { clearedCount: 0, remaining: [] };
   }
 
-  // Clear every partition before deleting metadata. If one storage operation
-  // fails, the metadata remains so the user can retry the cleanup.
+  // Clear every partition before changing metadata. If one storage operation
+  // fails, all metadata remains so the user can retry the cleanup.
   for (const connection of connections) {
     await clearConnectionStorage(connection.id);
   }
 
-  await removeAllSiteConnections();
+  await removeUnpinnedSiteConnections();
 
-  return connections.length;
+  return {
+    clearedCount: connections.length,
+    remaining: connections
+      .filter((connection) => connection.pinned)
+      .map((connection) => summarizeConnection(connection, 0)),
+  };
+}
+
+export async function setSiteConnectionPinnedData(
+  input: unknown,
+): Promise<SiteConnectionSummary> {
+  if (typeof input !== 'object' || input === null) {
+    throw new Error('站点固定参数不正确。');
+  }
+
+  const record = input as Record<string, unknown>;
+  const connectionId = parseSiteConnectionId(record.connectionId);
+
+  if (typeof record.pinned !== 'boolean') {
+    throw new Error('站点固定状态不正确。');
+  }
+
+  const connection = await setSiteConnectionPinned(connectionId, record.pinned);
+  const siteSession = session.fromPartition(
+    getSitePartitionName(connection.id),
+  );
+  const cookieCount = await getCookieCount(siteSession, connection.loginUrl);
+
+  return summarizeConnection(connection, cookieCount);
 }
 
 /**

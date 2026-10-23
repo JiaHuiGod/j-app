@@ -56,6 +56,7 @@ const siteConnection: SiteConnectionSummary = {
   loginUrl: 'https://github.com/login',
   createdAt: '2026-10-21T02:00:00.000Z',
   lastLoginAt: '2026-10-21T02:10:00.000Z',
+  pinned: false,
   cookieCount: 2,
   status: 'connected',
 };
@@ -66,6 +67,7 @@ const presetConnection: SiteConnectionSummary = {
   loginUrl: 'https://gitlab.com/users/sign_in',
   createdAt: '2026-10-21T03:00:00.000Z',
   lastLoginAt: null,
+  pinned: false,
   cookieCount: 0,
   status: 'empty',
 };
@@ -170,6 +172,7 @@ let createPresetConnection: ReturnType<
   typeof vi.fn<ConnectionsApi['createPreset']>
 >;
 let loginConnection: ReturnType<typeof vi.fn<ConnectionsApi['login']>>;
+let setPinnedConnection: ReturnType<typeof vi.fn<ConnectionsApi['setPinned']>>;
 let removeConnection: ReturnType<typeof vi.fn<ConnectionsApi['remove']>>;
 let clearAllConnections: ReturnType<typeof vi.fn<ConnectionsApi['clearAll']>>;
 let listDriveAccounts: ReturnType<typeof vi.fn<DriveApi['listAccounts']>>;
@@ -241,12 +244,15 @@ beforeEach(() => {
   loginConnection = vi
     .fn<ConnectionsApi['login']>()
     .mockResolvedValue(siteConnection);
+  setPinnedConnection = vi
+    .fn<ConnectionsApi['setPinned']>()
+    .mockResolvedValue(siteConnection);
   removeConnection = vi
     .fn<ConnectionsApi['remove']>()
-    .mockResolvedValue(undefined);
+    .mockResolvedValue({ removed: true, connection: null });
   clearAllConnections = vi
     .fn<ConnectionsApi['clearAll']>()
-    .mockResolvedValue(1);
+    .mockResolvedValue({ clearedCount: 1, remaining: [] });
   listDriveAccounts = vi
     .fn<DriveApi['listAccounts']>()
     .mockResolvedValue({ ok: true, data: [] });
@@ -379,6 +385,7 @@ beforeEach(() => {
     create: createConnection,
     createPreset: createPresetConnection,
     login: loginConnection,
+    setPinned: setPinnedConnection,
     remove: removeConnection,
     clearAll: clearAllConnections,
   };
@@ -1852,6 +1859,101 @@ describe('App', () => {
     expect(await screen.findByText('还没有保存的站点')).toBeDefined();
     expect(clearAllConnections).toHaveBeenCalledOnce();
     expect(screen.queryByText('GitHub')).toBeNull();
+  });
+
+  it('pins a site connection from the settings list', async () => {
+    listConnections.mockResolvedValue([siteConnection]);
+    setPinnedConnection.mockResolvedValue({
+      ...siteConnection,
+      pinned: true,
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByText('GitHub');
+
+    fireEvent.click(screen.getByRole('button', { name: '固定 GitHub' }));
+
+    expect(setPinnedConnection).toHaveBeenCalledWith({
+      connectionId: siteConnection.id,
+      pinned: true,
+    });
+    expect(await screen.findByText('已固定')).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: '取消固定 GitHub' }),
+    ).toBeDefined();
+  });
+
+  it('clears cookies but keeps a pinned site when removing it', async () => {
+    const pinnedConnection: SiteConnectionSummary = {
+      ...siteConnection,
+      pinned: true,
+    };
+    listConnections.mockResolvedValue([pinnedConnection]);
+    removeConnection.mockResolvedValue({
+      removed: false,
+      connection: {
+        ...pinnedConnection,
+        cookieCount: 0,
+        status: 'empty',
+      },
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByText('GitHub');
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 Cookie' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认清除' }));
+
+    expect(removeConnection).toHaveBeenCalledWith(siteConnection.id);
+    expect(await screen.findByText(/未检测到 Cookie/)).toBeDefined();
+    expect(screen.getByText('GitHub')).toBeDefined();
+    expect(screen.getByText('已固定')).toBeDefined();
+  });
+
+  it('keeps pinned sites when clearing all site data', async () => {
+    const pinnedConnection: SiteConnectionSummary = {
+      ...siteConnection,
+      pinned: true,
+    };
+    listConnections.mockResolvedValue([pinnedConnection, presetConnection]);
+    clearAllConnections.mockResolvedValue({
+      clearedCount: 2,
+      remaining: [
+        {
+          ...pinnedConnection,
+          cookieCount: 0,
+          status: 'empty',
+        },
+      ],
+    });
+
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await screen.findByText('GitHub');
+    fireEvent.click(screen.getByRole('button', { name: '清理全部' }));
+    await screen.findByRole('dialog', {
+      name: '清理全部站点数据',
+    });
+    fireEvent.click(screen.getByRole('button', { name: '清除全部站点' }));
+
+    expect(await screen.findByText(/未检测到 Cookie/)).toBeDefined();
+    expect(screen.getByText('GitHub')).toBeDefined();
+    expect(screen.queryByText('GitLab')).toBeNull();
+    expect(clearAllConnections).toHaveBeenCalledOnce();
   });
 
   it('switches the appearance theme from the title bar menu', async () => {

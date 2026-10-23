@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import type { ClearAllSiteConnectionsResult } from '@shared/connections';
 import { toErrorMessage } from '../lib/errors';
 import ui from '../styles/ui.module.css';
 import styles from './SiteDialogs.module.css';
 
 interface ClearAllSitesDialogProps {
   connectionCount: number;
-  onCleared: (count: number) => void;
+  pinnedCount: number;
+  onCleared: (result: ClearAllSiteConnectionsResult) => void;
   onClose: () => void;
 }
 
@@ -29,6 +31,7 @@ function WarningIcon() {
 
 export function ClearAllSitesDialog({
   connectionCount,
+  pinnedCount,
   onCleared,
   onClose,
 }: ClearAllSitesDialogProps) {
@@ -79,9 +82,9 @@ export function ClearAllSitesDialog({
     setError('');
 
     try {
-      const clearedCount = await window.desktop.connections.clearAll();
+      const result = await window.desktop.connections.clearAll();
 
-      onCleared(clearedCount);
+      onCleared(result);
       onClose();
     } catch (clearFailure: unknown) {
       setError(
@@ -114,7 +117,7 @@ export function ClearAllSitesDialog({
             </p>
             <h2 id="clear-all-title">清理全部站点数据</h2>
             <p id="clear-all-description">
-              将删除全部站点连接和本地登录状态，且无法撤销。
+              未固定站点会被移除；固定站点只清除 Cookie 和缓存，保留列表。
             </p>
           </div>
           <button
@@ -140,12 +143,16 @@ export function ClearAllSitesDialog({
 
           <div className={styles.summary}>
             <strong>{connectionCount} 个站点</strong>
-            <span>Cookie、缓存与登录状态</span>
+            <span>
+              {pinnedCount > 0
+                ? `${pinnedCount} 个固定站点保留，仅清除登录状态`
+                : 'Cookie、缓存与登录状态'}
+            </span>
           </div>
 
           <ul className={styles.list}>
-            <li>删除所有站点连接和保存的 Cookie；</li>
-            <li>清除对应持久会话中的缓存与站点存储；</li>
+            <li>删除未固定站点的连接和保存的 Cookie；</li>
+            <li>固定站点保留列表，只清除 Cookie、缓存和站点存储；</li>
             <li>保留网络代理和界面设置，不会影响其他应用数据。</li>
           </ul>
 
@@ -154,8 +161,8 @@ export function ClearAllSitesDialog({
               <WarningIcon />
             </span>
             <p>
-              此操作不可撤销。清理后需要重新登录所有站点。站点越多，
-              重新登录和恢复工作上下文的成本越高。
+              未固定站点删除后不可撤销；固定站点会保留，可重新登录恢复。
+              清理后所有站点都需要重新登录。
             </p>
           </div>
         </div>

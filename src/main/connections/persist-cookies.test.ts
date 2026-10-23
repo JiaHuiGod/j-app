@@ -9,6 +9,7 @@ const connection: SiteConnection = {
   loginUrl: 'https://115.com/',
   createdAt: '2026-10-21T13:00:00.000Z',
   lastLoginAt: null,
+  pinned: false,
 };
 
 function createSession(cookies: unknown[]) {

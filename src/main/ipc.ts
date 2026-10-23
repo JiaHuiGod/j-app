@@ -8,6 +8,7 @@ import {
   listSiteConnections,
   loginSiteConnection,
   removeSiteConnectionData,
+  setSiteConnectionPinnedData,
 } from './connections/session-manager';
 import { registerDriveIpcHandlers } from './drive/ipc';
 import { registerLocalVideoIpcHandlers } from './local-video/ipc';
@@ -108,11 +109,12 @@ export function registerIpcHandlers(): void {
     IpcChannel.LoginSiteConnection,
     (_event, connectionId: unknown) => loginSiteConnection(connectionId),
   );
+  ipcMain.handle(IpcChannel.SetSiteConnectionPinned, (_event, input: unknown) =>
+    setSiteConnectionPinnedData(input),
+  );
   ipcMain.handle(
     IpcChannel.RemoveSiteConnection,
-    async (_event, connectionId: unknown) => {
-      await removeSiteConnectionData(connectionId);
-    },
+    (_event, connectionId: unknown) => removeSiteConnectionData(connectionId),
   );
   ipcMain.handle(IpcChannel.ClearSiteConnections, () =>
     clearAllSiteConnectionData(),

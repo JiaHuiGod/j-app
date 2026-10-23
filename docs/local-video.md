@@ -153,4 +153,4 @@ posterUrl?: string;
   - 切换视图时封面变化，卡片不变形；
   - 播放后 `readyState=4`、seek 正常；
   - 最小化后切换到设置页，悬浮条仍在，恢复后仍是同一个 `<video>`。
-- 当前总测试数 111，`pnpm check` 和 `pnpm package` 通过。
+- 当前总测试数 115，`pnpm check` 和 `pnpm package` 通过。

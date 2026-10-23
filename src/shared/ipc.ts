@@ -1,6 +1,9 @@
 import type { AppearanceState, ThemePreference } from './appearance';
 import type {
+  ClearAllSiteConnectionsResult,
   CreateSiteConnectionInput,
+  RemoveSiteConnectionResult,
+  SetSiteConnectionPinnedInput,
   SiteConnectionSummary,
 } from './connections';
 import type {
@@ -58,6 +61,7 @@ export const IpcChannel = {
   CreateSiteConnection: 'connections:create',
   CreateSitePreset: 'connections:create-preset',
   LoginSiteConnection: 'connections:login',
+  SetSiteConnectionPinned: 'connections:set-pinned',
   RemoveSiteConnection: 'connections:remove',
   ClearSiteConnections: 'connections:clear-all',
   ListDriveAccounts: 'drive:list-accounts',
@@ -133,8 +137,11 @@ export interface ConnectionsApi {
     input: CreateSiteConnectionInput,
   ) => Promise<SiteConnectionSummary>;
   login: (connectionId: string) => Promise<SiteConnectionSummary>;
-  remove: (connectionId: string) => Promise<void>;
-  clearAll: () => Promise<number>;
+  setPinned: (
+    input: SetSiteConnectionPinnedInput,
+  ) => Promise<SiteConnectionSummary>;
+  remove: (connectionId: string) => Promise<RemoveSiteConnectionResult>;
+  clearAll: () => Promise<ClearAllSiteConnectionsResult>;
 }
 
 export interface DriveApi {
