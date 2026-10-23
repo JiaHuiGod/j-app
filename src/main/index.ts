@@ -10,6 +10,7 @@ import { applyProxySettings } from './network/proxy';
 import { installSecurityPolicies } from './security';
 import { loadSettings } from './settings/store';
 import { createAppTray, destroyAppTray, refreshTrayMenu } from './tray';
+import { initializeUpdates, stopUpdateChecks } from './updates/manager';
 import {
   createMainWindow,
   isCloseToTrayEnabled,
@@ -39,6 +40,7 @@ if (started) {
   });
 
   app.on('will-quit', () => {
+    stopUpdateChecks();
     destroyAppTray();
   });
 
@@ -95,6 +97,8 @@ if (started) {
         setWindowVisibilityHandler(refreshTrayMenu);
         refreshTrayMenu();
       }
+
+      initializeUpdates();
 
       app.on('activate', () => {
         void showMainWindow();

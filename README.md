@@ -2,7 +2,7 @@
 
 一个面向实际开发起步的 Electron 桌面应用工程：**Electron Forge + Vite + React 19 + TypeScript**。
 
-项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理、115 网盘浏览与文件管理，以及本地视频库和通用播放器。
+项目已经处理好主进程、预加载脚本、渲染进程的边界，并把 IPC 契约集中到共享类型中。当前包含中心化配置、三档主题外观、网络代理、页面导航、按站点隔离的 Cookie 会话管理、115 网盘浏览与文件管理、本地视频库和通用播放器，以及系统托盘、Windows 自动更新和 GitHub Releases 发布链路。
 
 ![J App 运行预览](docs/preview.png)
 
@@ -86,7 +86,10 @@ j-app/
 │  ├─ icon.ico                  # Windows 应用、任务栏与安装器图标
 │  └─ icon.icns                 # macOS 应用图标
 ├─ scripts/
-│  └─ generate-icons.mjs        # 由 favicon.svg 生成各平台图标
+│  ├─ generate-icons.mjs        # 由 favicon.svg 生成各平台图标
+│  └─ serve-updates.mjs         # CI 中为 Squirrel 差分构建提供历史更新镜像
+├─ .github/
+│  └─ workflows/release.yml     # Tag 触发的 Windows Release 构建与发布
 ├─ .husky/
 │  └─ pre-commit                # Git 提交前自动修复与校验
 ├─ .lintstagedrc.json           # 暂存文件的 Oxlint/Oxfmt 自动修复规则
@@ -136,6 +139,9 @@ j-app/
 │  │  ├─ ipc.ts               # ipcMain 处理器
 │  │  ├─ security.ts          # CSP 与 webview 防护
 │  │  ├─ tray.ts              # 托盘图标、菜单与快捷入口
+│  │  ├─ updates/
+│  │  │  ├─ feed.ts           # update.electronjs.org 地址与平台支持判断
+│  │  │  └─ manager.ts        # autoUpdater 状态、检查、下载与安装
 │  │  ├─ window-state.ts      # 窗口尺寸校验、多显示器回退
 │  │  └─ window.ts            # BrowserWindow、导航、外链与窗口状态持久化
 │  ├─ preload/                  # 预加载：受控 API 边界
@@ -182,6 +188,7 @@ j-app/
 │  │  │  ├─ ThemeIcon.tsx        # 主题菜单图标
 │  │  │  ├─ ThemeSettings.tsx    # 三档主题选择与预览
 │  │  │  ├─ TitleBar.tsx         # 自定义标题栏、导航与窗口控制
+│  │  │  ├─ UpdateSettings.tsx   # 当前版本、检查更新与重启安装
 │  │  │  └─ *.module.css         # 组件样式
 │  │  ├─ playback/              # 与业务无关的全局播放宿主
 │  │  │  ├─ GlobalVideoPlayerProvider.tsx
@@ -321,6 +328,46 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 - 不实现 Linux 开机自启和后台运行支持。
 
 窗口隐藏/恢复、托盘菜单刷新和单实例唤醒之间的协作集中在 [`src/main/window.ts`](src/main/window.ts) 与 [`src/main/index.ts`](src/main/index.ts)。
+
+## 自动更新与 GitHub 发布
+
+项目通过 GitHub 公开仓库和 [update.electronjs.org](https://update.electronjs.org) 分发 Windows x64 更新：
+
+- 仓库：`Nantoforget/j-app`
+- Release 资产：`RELEASES`、完整 nupkg、可选 delta nupkg、Setup.exe
+- 客户端：Electron 内置 `autoUpdater`
+- 更新源：`https://update.electronjs.org/Nantoforget/j-app/win32-x64/<version>`
+- 更新实现：[`src/main/updates/manager.ts`](src/main/updates/manager.ts)
+- 地址与平台判断：[`src/main/updates/feed.ts`](src/main/updates/feed.ts)
+
+发布流程：
+
+1. 修改 `package.json` 版本，例如 `0.2.0`
+2. 提交并创建 Tag：`v0.2.0`
+3. 推送 Tag，触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)
+4. Actions 执行 `pnpm check` 和 `pnpm make`
+5. 创建 draft Release，上传 Windows 资产
+6. 发布 Release 后，已安装版本会在启动后或定时检查到更新
+
+CI 会下载上一版本 Release 的 `RELEASES` 和完整 nupkg，启动本地临时更新镜像，再通过 Forge `MakerSquirrel` 的 `remoteReleases` 生成本次 delta。没有上一版本或历史资产不完整时自动退化为全量包。
+
+客户端行为：
+
+- 仅安装版 Windows x64 启用自动更新；开发环境显示为不支持
+- 启动约 20 秒后检查一次，之后每 4 小时检查
+- 设置页“关于与更新”可手动检查
+- 发现更新后自动在后台下载
+- 下载完成后提示重启安装，不自动打断当前任务
+- Electron `autoUpdater` 在 Windows 上不提供下载进度，因此界面只显示不确定进度
+- 安装更新前会绕过“关闭窗口到托盘”，保存窗口状态后退出并启动安装器
+- 不提供回滚；如果发布版本有问题，直接发布更高 patch 版本修复
+
+限制：
+
+- GitHub 仓库必须保持 public
+- 目前只构建 Windows x64
+- 未配置 Windows 代码签名，首次安装可能触发 SmartScreen
+- 不支持 beta 渠道、按比例灰度和下载进度
 
 ## 主导航与页面
 

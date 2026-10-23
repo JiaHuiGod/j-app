@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "A secure, typed Electron desktop starter built with React and TypeScript.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nantoforget/j-app.git"
+  },
   "keywords": [
     "electron",
     "react",
@@ -12,8 +16,8 @@
   ],
   "license": "MIT",
   "author": {
-    "name": "jia",
-    "email": "jiachatgpt@gmail.com"
+    "name": "Nantoforget",
+    "email": "104240523+Nantoforget@users.noreply.github.com"
   },
   "main": ".vite/build/main.cjs",
   "packageManager": "pnpm@11.21.0",

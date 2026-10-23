@@ -25,6 +25,7 @@ import type {
 } from '@shared/ipc';
 import type { LocalVideoApi } from '@shared/local-video';
 import type { DesktopBehaviorState, ProxySettings } from '@shared/settings';
+import type { UpdateState } from '@shared/updates';
 import App from './App';
 
 const appInfo: AppInfo = {
@@ -55,6 +56,17 @@ const desktopBehaviorState: DesktopBehaviorState = {
   startAtLogin: false,
   startHidden: true,
   canAutoStart: true,
+};
+
+const updateState: UpdateState = {
+  status: 'idle',
+  supported: true,
+  currentVersion: '0.1.0',
+  availableVersion: null,
+  releaseNotes: null,
+  releaseDate: null,
+  lastCheckedAt: null,
+  error: null,
 };
 
 const siteConnection: SiteConnectionSummary = {
@@ -177,6 +189,9 @@ let getDesktopBehavior: ReturnType<typeof vi.fn<DesktopApi['desktop']['get']>>;
 let saveDesktopBehavior: ReturnType<
   typeof vi.fn<DesktopApi['desktop']['save']>
 >;
+let getUpdateState: ReturnType<typeof vi.fn<DesktopApi['updates']['getState']>>;
+let checkForUpdates: ReturnType<typeof vi.fn<DesktopApi['updates']['check']>>;
+let installUpdate: ReturnType<typeof vi.fn<DesktopApi['updates']['install']>>;
 let listConnections: ReturnType<typeof vi.fn<ConnectionsApi['list']>>;
 let createConnection: ReturnType<typeof vi.fn<ConnectionsApi['create']>>;
 let createPresetConnection: ReturnType<
@@ -253,6 +268,15 @@ beforeEach(() => {
     .mockImplementation((input) =>
       Promise.resolve({ ...desktopBehaviorState, ...input }),
     );
+  getUpdateState = vi
+    .fn<DesktopApi['updates']['getState']>()
+    .mockResolvedValue(updateState);
+  checkForUpdates = vi
+    .fn<DesktopApi['updates']['check']>()
+    .mockResolvedValue(updateState);
+  installUpdate = vi
+    .fn<DesktopApi['updates']['install']>()
+    .mockResolvedValue(undefined);
   listConnections = vi.fn<ConnectionsApi['list']>().mockResolvedValue([]);
   createConnection = vi
     .fn<ConnectionsApi['create']>()
@@ -475,6 +499,14 @@ beforeEach(() => {
     desktop: {
       get: getDesktopBehavior,
       save: saveDesktopBehavior,
+    },
+    updates: {
+      getState: getUpdateState,
+      check: checkForUpdates,
+      install: installUpdate,
+      onStateChange: vi
+        .fn<DesktopApi['updates']['onStateChange']>()
+        .mockReturnValue(() => {}),
     },
     settings,
     appearance,
@@ -2054,6 +2086,24 @@ describe('App', () => {
         startAtLogin: false,
         startHidden: true,
       });
+    });
+  });
+
+  it('checks for updates from the settings page', async () => {
+    render(<App />);
+    await screen.findByRole('button', {
+      name: '网络代理，当前已开启',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+
+    expect(await screen.findByText('当前版本')).toBeDefined();
+    expect(screen.getByText('0.1.0')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: '检查更新' }));
+
+    await waitFor(() => {
+      expect(checkForUpdates).toHaveBeenCalledOnce();
     });
   });
 

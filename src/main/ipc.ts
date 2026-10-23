@@ -17,6 +17,11 @@ import {
 import { registerDriveIpcHandlers } from './drive/ipc';
 import { registerLocalVideoIpcHandlers } from './local-video/ipc';
 import { testProxySettings } from './network/proxy';
+import {
+  checkForAppUpdates,
+  getUpdateState,
+  installUpdate,
+} from './updates/manager';
 import { setCloseToTrayEnabled } from './window';
 import {
   getDownloadDirectory,
@@ -60,6 +65,9 @@ export function registerIpcHandlers(): void {
       return state;
     },
   );
+  ipcMain.handle(IpcChannel.GetUpdateState, () => getUpdateState());
+  ipcMain.handle(IpcChannel.CheckForUpdates, () => checkForAppUpdates());
+  ipcMain.handle(IpcChannel.InstallUpdate, () => installUpdate());
   ipcMain.handle(IpcChannel.GetProxySettings, () => getProxySettings());
   ipcMain.handle(
     IpcChannel.SaveProxySettings,

@@ -34,6 +34,7 @@ import type {
 import type { ProxySettings, ProxyTestResult } from './settings';
 import type { DesktopBehaviorState, DesktopBehaviorUpdate } from './settings';
 import type { LocalVideoApi } from './local-video';
+import type { UpdatesApi } from './updates';
 
 /**
  * Contract shared by the main, preload, and renderer processes.
@@ -49,6 +50,10 @@ export const IpcChannel = {
   AppNavigate: 'app:navigate',
   GetDesktopBehavior: 'desktop:get-behavior',
   SaveDesktopBehavior: 'desktop:save-behavior',
+  GetUpdateState: 'updates:get-state',
+  CheckForUpdates: 'updates:check',
+  InstallUpdate: 'updates:install',
+  UpdateStateChanged: 'updates:state-changed',
   GetProxySettings: 'settings:get-proxy',
   SaveProxySettings: 'settings:save-proxy',
   TestProxySettings: 'settings:test-proxy',
@@ -207,6 +212,7 @@ export interface DesktopApi {
   readonly getAppInfo: () => Promise<AppInfo>;
   readonly windowControls: WindowControls;
   readonly desktop: DesktopBehaviorApi;
+  readonly updates: UpdatesApi;
   readonly settings: SettingsApi;
   readonly appearance: AppearanceApi;
   readonly connections: ConnectionsApi;

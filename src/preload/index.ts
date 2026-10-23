@@ -35,6 +35,7 @@ import {
   type WindowControls,
 } from '@shared/ipc';
 import type { ProxySettings } from '@shared/settings';
+import type { UpdateState, UpdatesApi } from '@shared/updates';
 import type {
   LocalVideoApi,
   LocalVideoScanProgress,
@@ -61,6 +62,23 @@ const windowControls = Object.freeze<WindowControls>({
 
     return () => {
       ipcRenderer.removeListener(IpcChannel.WindowMaximizedChanged, handler);
+    };
+  },
+});
+
+const updates = Object.freeze<UpdatesApi>({
+  getState: () => ipcRenderer.invoke(IpcChannel.GetUpdateState),
+  check: () => ipcRenderer.invoke(IpcChannel.CheckForUpdates),
+  install: () => ipcRenderer.invoke(IpcChannel.InstallUpdate),
+  onStateChange: (listener: (state: UpdateState) => void) => {
+    const handler = (_event: IpcRendererEvent, state: UpdateState) => {
+      listener(state);
+    };
+
+    ipcRenderer.on(IpcChannel.UpdateStateChanged, handler);
+
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.UpdateStateChanged, handler);
     };
   },
 });
@@ -261,6 +279,7 @@ const desktopApi = Object.freeze<DesktopApi>({
   getAppInfo: () => ipcRenderer.invoke(IpcChannel.GetAppInfo),
   windowControls,
   desktop,
+  updates,
   settings,
   appearance,
   connections,

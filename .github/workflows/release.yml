@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $VERSION"
+            exit 1
+          fi
+
+      - name: Run checks
+        run: pnpm check
+
+      - name: Prepare delta update mirror
+        shell: bash
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous release tag; building a full package only."
+            exit 0
+          fi
+
+          mkdir -p .update-mirror
+          if ! gh release download "$PREV_TAG" \
+            --dir .update-mirror \
+            --pattern 'RELEASES' \
+            --pattern '*-full.nupkg'; then
+            echo "Previous release assets are incomplete; building a full package only."
+            exit 0
+          fi
+
+          node scripts/serve-updates.mjs .update-mirror 8787 > .update-server.log 2>&1 &
+          echo $! > .update-server.pid
+          sleep 2
+          echo "JAPP_UPDATE_BASE_URL=http://127.0.0.1:8787" >> "$GITHUB_ENV"
+
+      - name: Build Squirrel package
+        run: pnpm make
+
+      - name: Stop update mirror
+        if: always()
+        shell: bash
+        run: |
+          if [ -f .update-server.pid ]; then
+            kill "$(cat .update-server.pid)" 2>/dev/null || true
+          fi
+
+      - name: Create draft release
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "J App $VERSION" \
+            --generate-notes
+
+      - name: Upload Windows artifacts
+        shell: bash
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            out/make/squirrel.windows/x64/RELEASES \
+            out/make/squirrel.windows/x64/*.nupkg \
+            out/make/squirrel.windows/x64/*.exe
+
+      - name: Publish release
+        shell: bash
+        run: |
+          gh release edit "$GITHUB_REF_NAME" --draft=false

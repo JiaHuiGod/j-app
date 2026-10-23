@@ -12,6 +12,7 @@ import { ClearAllSitesDialog } from '../components/ClearAllSitesDialog';
 import { DownloadSettings } from '../components/DownloadSettings';
 import { GlobeIcon } from '../components/GlobeIcon';
 import { ThemeSettings } from '../components/ThemeSettings';
+import { UpdateSettings } from '../components/UpdateSettings';
 import type { AppearanceController } from '../hooks/useAppearance';
 import { toErrorMessage } from '../lib/errors';
 import page from '../styles/page.module.css';
@@ -449,6 +450,8 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
       </section>
 
       <DownloadSettings />
+
+      <UpdateSettings />
 
       <section aria-labelledby="connections-title" className={styles.card}>
         <header className={styles.cardHeader}>

@@ -20,7 +20,11 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ setupIcon: `${iconBase}.ico` }),
+    new MakerSquirrel({
+      setupIcon: `${iconBase}.ico`,
+      remoteReleases: process.env.JAPP_UPDATE_BASE_URL,
+      noDelta: false,
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({ options: { icon: `${iconBase}.png` } }),
     new MakerDeb({ options: { icon: `${iconBase}.png` } }),

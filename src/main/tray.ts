@@ -7,6 +7,12 @@ import {
   navigateMainWindow,
   showMainWindow,
 } from './window';
+import {
+  checkForAppUpdates,
+  getUpdateState,
+  installUpdate,
+  onUpdateStateChange,
+} from './updates/manager';
 
 interface TrayHandlers {
   readonly onQuit: () => void;
@@ -14,6 +20,7 @@ interface TrayHandlers {
 
 let tray: Tray | null = null;
 let handlers: TrayHandlers | null = null;
+let unsubscribeUpdates: (() => void) | null = null;
 
 function isWindowVisible(): boolean {
   const window = getMainWindow();
@@ -36,6 +43,37 @@ export function refreshTrayMenu(): void {
   }
 
   const visible = isWindowVisible();
+  const updateState = getUpdateState();
+  const updateItem =
+    updateState.status === 'downloaded'
+      ? {
+          label: updateState.availableVersion
+            ? `重启并安装 ${updateState.availableVersion}`
+            : '重启并安装更新',
+          click: () => {
+            void installUpdate().catch((error: unknown) => {
+              console.error('Failed to install update:', error);
+            });
+          },
+        }
+      : {
+          label:
+            updateState.status === 'checking'
+              ? '正在检查更新…'
+              : updateState.status === 'downloading'
+                ? '正在下载更新…'
+                : updateState.supported
+                  ? '检查更新'
+                  : '检查更新（仅安装版支持）',
+          enabled:
+            updateState.supported &&
+            updateState.status !== 'checking' &&
+            updateState.status !== 'downloading',
+          click: () => {
+            void checkForAppUpdates();
+          },
+        };
+
   const menu = Menu.buildFromTemplate([
     {
       label: visible ? '隐藏到托盘' : '显示 J App',
@@ -61,6 +99,8 @@ export function refreshTrayMenu(): void {
         openPage('settings');
       },
     },
+    { type: 'separator' },
+    updateItem,
     { type: 'separator' },
     {
       label: '退出 J App',
@@ -94,12 +134,15 @@ export function createAppTray(trayHandlers: TrayHandlers): boolean {
   );
   tray.setToolTip('J App');
   tray.on('click', showWindow);
+  unsubscribeUpdates = onUpdateStateChange(refreshTrayMenu);
   refreshTrayMenu();
 
   return true;
 }
 
 export function destroyAppTray(): void {
+  unsubscribeUpdates?.();
+  unsubscribeUpdates = null;
   tray?.destroy();
   tray = null;
   handlers = null;
