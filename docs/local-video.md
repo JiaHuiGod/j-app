@@ -22,7 +22,7 @@ src/renderer/features/local-video/
   LocalVideoProvider.tsx        多库扫描状态、播放器请求、本地进度
   LocalVideoPage.tsx            页面、网格/列表、搜索、排序、文件夹管理
   LocalVideoPage.module.css     卡片、列表、封面适配和响应式样式
-  local-video-preferences.ts    视图模式和本地播放进度持久化
+  local-video-preferences.ts    视图模式、文件夹分组和本地播放进度持久化
 
 src/renderer/navigation.ts      导航增加“本地”
 src/renderer/App.tsx            首次访问后保持页面和 Provider 挂载
@@ -36,6 +36,7 @@ src/renderer/App.tsx            首次访问后保持页面和 Provider 挂载
 - 文件夹选择使用 `properties: ['openDirectory', 'multiSelections']`，一次可以选择多个。
 - 已选目录保存在 settings 的 `localVideo.directories`，最多 50 个。
 - 页面顶部显示文件夹 chips，每个 chip 显示文件夹名和视频数量，右侧 `×` 可删除。
+- 文件夹 chip 本体可点击筛选：支持只显示一个文件夹或多个文件夹；`全部` 清除筛选。
 - 删除文件夹只更新 settings 和当前库，不重新扫描其他文件夹；操作前显示二次确认，不会删除磁盘文件。
 - 扫描失败文件夹的错误提示中也可通过二次确认移除该配置。
 - 新增或重新扫描会对全部已保存文件夹顺序扫描。
@@ -103,14 +104,18 @@ posterUrl?: string;
 - 本地视频使用 `kind: 'file'`，播放器直接设置 `video.src`、`load()` 和 `play()`，不经过 hls.js。
 - 当前选中的 poster 作为 `video.poster`。
 - 工具栏、音量、倍速、全屏、最小化和全局悬浮条全部复用。
-- 本地 provider 把全部文件夹的视频作为播放列表，播放结束自动进入下一个视频。
+- 本地 provider 把当前筛选、搜索和分组后的视频顺序作为播放列表，播放结束自动进入下一个视频。
 - 本地进度保存在 `japp.local-progress.v1:<videoId>`，再次打开时从上次位置继续。
 
 ## 页面布局
 
 - 头部与网盘页一致：紧凑 eyebrow、`1.7–2.05rem` 标题、单行说明、右侧操作按钮。
-- 顶部文件夹 chips + 扫描状态。
-- LIBRARY 工具栏包含文件夹数量、扫描时间、搜索、排序和网格/列表切换。
+- 顶部文件夹 chips + 扫描状态；chip 本体筛选，`×` 删除。
+- LIBRARY 工具栏包含文件夹数量、扫描时间、搜索、排序、分组开关和网格/列表切换。
+- 网格和列表共用同一套筛选、搜索、排序和分组状态；视图切换只改变卡片样式。
+- 列表视图启用“分组”后按文件夹分区显示，分区标题包含文件夹名和当前可见视频数量，并用分隔线区分；网格视图同样按文件夹分区，只是卡片改为 poster。
+- 单个可见文件夹时省略重复标题。
+- 筛选为会话状态，刷新后恢复全部；分组偏好保存在 `japp.local-group.v1`。
 - 页脚使用 fluid page slot，排在卡片列表之后，不再覆盖内容。
 - 响应式：1180px 宽度为 5 列网格，900px 为 4 列，窄屏为 2 列；列表视图使用横向卡片网格，1180px 约 4 列、900px 约 3 列。
 
@@ -141,11 +146,11 @@ posterUrl?: string;
 - 主进程扫描测试覆盖嵌套目录、视频识别、poster/thumb 优先级、隐藏目录和稳定 ID。
 - 字幕测试覆盖 115 同款模糊匹配、`ADN-503` 短名、设置字幕目录、UTF-16LE、GB18030 回退和其他视频字幕隔离。
 - 设置测试覆盖旧单目录到 `directories` 的迁移。
-- 页面测试覆盖多文件夹删除二次确认、网格/列表切换、不同封面、字幕挂载和本地 `file` source 播放。
+- 页面测试覆盖文件夹单选/多选/全部筛选、网格/列表分组同步、筛选后的播放列表、删除二次确认、网格/列表切换、不同封面、字幕挂载和本地 `file` source 播放。
 - 真实本地视频验证：
   - 两个文件夹、8 个视频；
   - 网格使用 379×535 poster，列表使用 800×535 thumb；
   - 切换视图时封面变化，卡片不变形；
   - 播放后 `readyState=4`、seek 正常；
   - 最小化后切换到设置页，悬浮条仍在，恢复后仍是同一个 `<video>`。
-- 当前总测试数 108，`pnpm check` 和 `pnpm package` 通过。
+- 当前总测试数 111，`pnpm check` 和 `pnpm package` 通过。

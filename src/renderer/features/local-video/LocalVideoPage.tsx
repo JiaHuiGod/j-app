@@ -11,7 +11,9 @@ import { PlayIcon } from '../../components/video-player/PlayerIcons';
 import ui from '../../styles/ui.module.css';
 import { useLocalVideo } from './LocalVideoProvider';
 import {
+  readGroupByFolder,
   readViewMode,
+  saveGroupByFolder,
   saveViewMode,
   type LocalVideoViewMode,
 } from './local-video-preferences';
@@ -332,6 +334,10 @@ export function LocalVideoPage() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('name');
   const [view, setView] = useState<LocalVideoViewMode>(readViewMode);
+  const [groupByFolder, setGroupByFolder] = useState(readGroupByFolder);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<
+    readonly string[]
+  >([]);
   const [pendingRemoval, setPendingRemoval] =
     useState<PendingFolderRemoval | null>(null);
 
@@ -341,17 +347,44 @@ export function LocalVideoPage() {
     '',
   );
   const truncated = libraries.some((library) => library.truncated);
+  const selectedLibrarySet = useMemo(
+    () => new Set(selectedLibraryIds),
+    [selectedLibraryIds],
+  );
+  const hasFolderFilter = selectedLibraryIds.length > 0;
+  const hasSearch = query.trim().length > 0;
 
-  const visibleVideos = useMemo(() => {
+  useEffect(() => {
+    setSelectedLibraryIds((current) => {
+      const next = current.filter((id) =>
+        libraries.some((library) => library.id === id),
+      );
+
+      if (next.length === 0) {
+        return current.length === 0 ? current : [];
+      }
+
+      if (next.length >= libraries.length) {
+        return [];
+      }
+
+      return next.length === current.length ? current : next;
+    });
+  }, [libraries]);
+
+  const sortedVideos = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
+    const folderFiltered = hasFolderFilter
+      ? videos.filter((video) => selectedLibrarySet.has(video.libraryId))
+      : videos;
     const filtered = normalizedQuery
-      ? videos.filter(
+      ? folderFiltered.filter(
           (video) =>
             video.title.toLocaleLowerCase().includes(normalizedQuery) ||
             video.relativePath.toLocaleLowerCase().includes(normalizedQuery) ||
             video.libraryName.toLocaleLowerCase().includes(normalizedQuery),
         )
-      : videos;
+      : folderFiltered;
 
     return [...filtered].sort((left, right) => {
       if (sort === 'size') {
@@ -367,12 +400,79 @@ export function LocalVideoPage() {
         sensitivity: 'base',
       });
     });
-  }, [query, sort, videos]);
+  }, [hasFolderFilter, query, selectedLibrarySet, sort, videos]);
+
+  const visibleGroups = useMemo(() => {
+    if (!groupByFolder) {
+      return [];
+    }
+
+    return libraries
+      .filter(
+        (library) => !hasFolderFilter || selectedLibrarySet.has(library.id),
+      )
+      .map((library) => ({
+        library,
+        videos: sortedVideos.filter((video) => video.libraryId === library.id),
+      }))
+      .filter((group) => group.videos.length > 0);
+  }, [
+    groupByFolder,
+    hasFolderFilter,
+    libraries,
+    selectedLibrarySet,
+    sortedVideos,
+  ]);
+
+  const visibleVideos = groupByFolder
+    ? visibleGroups.flatMap((group) => group.videos)
+    : sortedVideos;
+
+  const countLabel =
+    hasFolderFilter || hasSearch
+      ? `${visibleVideos.length} / ${videos.length} 个视频`
+      : `${videos.length} 个视频`;
 
   const setViewMode = (mode: LocalVideoViewMode) => {
     setView(mode);
     saveViewMode(mode);
   };
+
+  const toggleFolderFilter = (libraryId: string) => {
+    setSelectedLibraryIds((current) => {
+      const next = current.includes(libraryId)
+        ? current.filter((id) => id !== libraryId)
+        : [...current, libraryId];
+
+      return next.length >= libraries.length ? [] : next;
+    });
+  };
+
+  const clearFolderFilter = () => {
+    setSelectedLibraryIds([]);
+  };
+
+  const toggleGroupByFolder = () => {
+    setGroupByFolder((current) => {
+      const next = !current;
+      saveGroupByFolder(next);
+      return next;
+    });
+  };
+
+  const playVisibleVideo = (videoId: string) => {
+    playVideo(videoId, visibleVideos);
+  };
+
+  const renderVideoCards = (items: readonly LocalVideoItem[]) =>
+    items.map((video) => (
+      <LocalVideoCard
+        key={video.id}
+        onPlay={playVisibleVideo}
+        video={video}
+        view={view}
+      />
+    ));
 
   const requestFolderRemoval = (
     libraryId: string,
@@ -399,7 +499,7 @@ export function LocalVideoPage() {
           <p className={styles.eyebrow}>LOCAL / LIBRARY</p>
           <div className={styles.titleRow}>
             <h1>本地视频</h1>
-            <span className={styles.countPill}>{videos.length} 个视频</span>
+            <span className={styles.countPill}>{countLabel}</span>
           </div>
           <p className={styles.subtitle}>
             添加一个或多个文件夹，网格显示海报、列表显示缩略图，点击即可播放。
@@ -468,30 +568,63 @@ export function LocalVideoPage() {
         <section className={styles.folderBar} aria-label="本地视频文件夹">
           <span className={styles.folderBarLabel}>文件夹</span>
           <div className={styles.folderChips}>
-            {libraries.map((library) => (
-              <span className={styles.folderChip} key={library.id}>
-                <FolderIcon />
-                <span className={styles.folderName} title={library.name}>
-                  {library.name}
-                </span>
-                <small>{library.videos.length}</small>
-                <button
-                  aria-label={`移除文件夹 ${library.name}`}
-                  disabled={isScanning}
-                  title="移除文件夹"
-                  type="button"
-                  onClick={() => {
-                    requestFolderRemoval(
-                      library.id,
-                      library.name,
-                      library.videos.length,
-                    );
-                  }}
+            {libraries.length > 1 && (
+              <button
+                aria-pressed={!hasFolderFilter}
+                className={`${styles.allFoldersChip}${
+                  !hasFolderFilter ? ` ${styles.allFoldersChipActive}` : ''
+                }`}
+                type="button"
+                onClick={clearFolderFilter}
+              >
+                全部
+              </button>
+            )}
+            {libraries.map((library) => {
+              const active = selectedLibrarySet.has(library.id);
+
+              return (
+                <span
+                  className={`${styles.folderChip}${
+                    active ? ` ${styles.folderChipActive}` : ''
+                  }`}
+                  key={library.id}
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  <button
+                    aria-label={`筛选文件夹 ${library.name}`}
+                    aria-pressed={active}
+                    className={styles.folderFilter}
+                    title={active ? '取消筛选此文件夹' : '只显示此文件夹'}
+                    type="button"
+                    onClick={() => {
+                      toggleFolderFilter(library.id);
+                    }}
+                  >
+                    <FolderIcon />
+                    <span className={styles.folderName} title={library.name}>
+                      {library.name}
+                    </span>
+                    <small>{library.videos.length}</small>
+                  </button>
+                  <button
+                    aria-label={`移除文件夹 ${library.name}`}
+                    className={styles.folderRemove}
+                    disabled={isScanning}
+                    title="移除文件夹"
+                    type="button"
+                    onClick={() => {
+                      requestFolderRemoval(
+                        library.id,
+                        library.name,
+                        library.videos.length,
+                      );
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
           </div>
         </section>
       )}
@@ -534,8 +667,24 @@ export function LocalVideoPage() {
           <section className={styles.libraryBar} aria-label="本地视频库信息">
             <div className={styles.librarySummary}>
               <span className={styles.kicker}>LIBRARY</span>
-              <strong>{libraries.length} 个文件夹</strong>
+              <div className={styles.summaryTitleRow}>
+                <strong>
+                  {hasFolderFilter
+                    ? `已选 ${selectedLibraryIds.length} / ${libraries.length} 个文件夹`
+                    : `${libraries.length} 个文件夹`}
+                </strong>
+                {hasFolderFilter && (
+                  <button
+                    className={styles.clearFilter}
+                    type="button"
+                    onClick={clearFolderFilter}
+                  >
+                    清除筛选
+                  </button>
+                )}
+              </div>
               <span>
+                {hasFolderFilter ? `${visibleVideos.length} 个视频 · ` : ''}
                 {latestScan ? `扫描于 ${formatDate(latestScan)}` : '等待扫描'}
                 {truncated ? ' · 已达到扫描上限' : ''}
               </span>
@@ -564,6 +713,19 @@ export function LocalVideoPage() {
                 <option value="modified">按修改时间</option>
                 <option value="size">按文件大小</option>
               </select>
+              <button
+                aria-label="按文件夹分组"
+                aria-pressed={groupByFolder}
+                className={`${styles.groupToggle}${
+                  groupByFolder ? ` ${styles.groupToggleActive}` : ''
+                }`}
+                title={groupByFolder ? '取消按文件夹分组' : '按文件夹分组显示'}
+                type="button"
+                onClick={toggleGroupByFolder}
+              >
+                <FolderIcon />
+                <span>分组</span>
+              </button>
               <div aria-label="显示方式" className={styles.viewToggle}>
                 <ViewButton
                   active={view === 'grid'}
@@ -607,22 +769,83 @@ export function LocalVideoPage() {
 
           {visibleVideos.length === 0 ? (
             <section className={styles.empty}>
-              <strong>没有匹配的视频</strong>
-              <span>换一个关键词，或清除搜索条件。</span>
+              <strong>
+                {hasFolderFilter
+                  ? '当前文件夹没有匹配的视频'
+                  : '没有匹配的视频'}
+              </strong>
+              <span>
+                {hasFolderFilter && hasSearch
+                  ? '当前文件夹筛选和搜索条件下没有结果。'
+                  : hasFolderFilter
+                    ? '该文件夹中没有视频。'
+                    : '换一个关键词，或清除搜索条件。'}
+              </span>
+              {(hasFolderFilter || hasSearch) && (
+                <div className={styles.emptyActions}>
+                  {hasFolderFilter && (
+                    <button
+                      className={`${ui.button} ${ui.buttonSecondary}`}
+                      type="button"
+                      onClick={clearFolderFilter}
+                    >
+                      显示全部文件夹
+                    </button>
+                  )}
+                  {hasSearch && (
+                    <button
+                      className={`${ui.button} ${ui.buttonSecondary}`}
+                      type="button"
+                      onClick={() => {
+                        setQuery('');
+                      }}
+                    >
+                      清除搜索
+                    </button>
+                  )}
+                </div>
+              )}
             </section>
+          ) : groupByFolder && visibleGroups.length > 1 ? (
+            <div
+              aria-label="按文件夹分组的本地视频"
+              className={styles.folderGroups}
+            >
+              {visibleGroups.map((group) => {
+                const headingId = `local-folder-group-${group.library.id}`;
+
+                return (
+                  <section
+                    aria-labelledby={headingId}
+                    className={styles.folderGroup}
+                    key={group.library.id}
+                  >
+                    <header className={styles.folderGroupHeader}>
+                      <FolderIcon />
+                      <h2 id={headingId}>{group.library.name}</h2>
+                      <span>{group.videos.length} 个视频</span>
+                      <span
+                        aria-hidden="true"
+                        className={styles.folderGroupLine}
+                      />
+                    </header>
+                    <div
+                      className={
+                        view === 'grid' ? styles.grid : styles.listGrid
+                      }
+                    >
+                      {renderVideoCards(group.videos)}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
           ) : (
             <section
               className={view === 'grid' ? styles.grid : styles.listGrid}
               aria-label="本地视频列表"
             >
-              {visibleVideos.map((video) => (
-                <LocalVideoCard
-                  key={video.id}
-                  onPlay={playVideo}
-                  video={video}
-                  view={view}
-                />
-              ))}
+              {renderVideoCards(visibleVideos)}
             </section>
           )}
         </>

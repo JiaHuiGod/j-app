@@ -35,7 +35,10 @@ interface LocalVideoContextValue {
   readonly removeFolder: (libraryId: string) => void;
   readonly cancelScan: () => void;
   readonly clearError: () => void;
-  readonly playVideo: (videoId: string) => void;
+  readonly playVideo: (
+    videoId: string,
+    playlist?: readonly LocalVideoItem[],
+  ) => void;
 }
 
 const LocalVideoContext = createContext<LocalVideoContextValue | null>(null);
@@ -69,7 +72,9 @@ export function LocalVideoProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const scanRequestRef = useRef(0);
   const playRequestRef = useRef(0);
-  const playVideoRef = useRef<(videoId: string) => void>(() => {});
+  const playVideoRef = useRef<
+    (videoId: string, playlist?: readonly LocalVideoItem[]) => void
+  >(() => {});
 
   const videos = useMemo(
     () => libraries.flatMap((library) => library.videos),
@@ -182,12 +187,19 @@ export function LocalVideoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const playVideoInternal = useCallback(
-    async (videoId: string) => {
+    async (videoId: string, playlist?: readonly LocalVideoItem[]) => {
       const requestId = playRequestRef.current + 1;
       playRequestRef.current = requestId;
 
-      const index = videos.findIndex((video) => video.id === videoId);
-      const video = videos[index];
+      let items = playlist && playlist.length > 0 ? playlist : videos;
+      let index = items.findIndex((video) => video.id === videoId);
+      let video = items[index];
+
+      if (!video) {
+        items = videos;
+        index = items.findIndex((item) => item.id === videoId);
+        video = items[index];
+      }
 
       if (!video) {
         return;
@@ -216,7 +228,7 @@ export function LocalVideoProvider({ children }: { children: ReactNode }) {
         activeId: video.id,
         kicker: 'LOCAL / PLAYBACK',
         isLoading: false,
-        playlist: videos.map((item) => ({
+        playlist: items.map((item) => ({
           id: item.id,
           title: item.title,
           displayTitle: item.title,
@@ -239,20 +251,20 @@ export function LocalVideoProvider({ children }: { children: ReactNode }) {
         title: video.title,
         onClose: () => {},
         onEnded: () => {
-          const next = videos[index + 1];
+          const next = items[index + 1];
 
           if (next) {
-            playVideoRef.current(next.id);
+            playVideoRef.current(next.id, items);
           }
         },
         onProgress: (position, duration) => {
           saveLocalProgress(video.id, position, duration);
         },
         onRetry: () => {
-          playVideoRef.current(video.id);
+          playVideoRef.current(video.id, items);
         },
         onSelectPlaylist: (id) => {
-          playVideoRef.current(id);
+          playVideoRef.current(id, items);
         },
       });
     },
@@ -260,9 +272,9 @@ export function LocalVideoProvider({ children }: { children: ReactNode }) {
   );
 
   const playVideo = useCallback(
-    (videoId: string) => {
+    (videoId: string, playlist?: readonly LocalVideoItem[]) => {
       restorePlayer();
-      void playVideoInternal(videoId);
+      void playVideoInternal(videoId, playlist);
     },
     [playVideoInternal, restorePlayer],
   );

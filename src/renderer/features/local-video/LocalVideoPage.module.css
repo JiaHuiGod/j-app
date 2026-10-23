@@ -121,24 +121,72 @@
   min-width: 0;
 }
 
+.allFoldersChip {
+  height: 28px;
+  padding: 0 10px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.allFoldersChip:hover {
+  color: var(--ink);
+}
+
+.allFoldersChipActive {
+  color: var(--blue);
+  background: rgb(33 72 255 / 8%);
+  border-color: rgb(33 72 255 / 26%);
+}
+
 .folderChip {
   display: flex;
-  gap: 5px;
   align-items: center;
-  max-width: 310px;
-  padding: 4px 5px 4px 8px;
+  max-width: 330px;
+  height: 28px;
   color: var(--ink);
   font-size: 0.62rem;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 999px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
-.folderChip svg {
+.folderChipActive {
+  background: rgb(33 72 255 / 8%);
+  border-color: rgb(33 72 255 / 28%);
+}
+
+.folderFilter {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0 3px 0 8px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.folderFilter svg {
   flex: none;
   width: 13px;
   height: 13px;
   color: var(--muted);
+}
+
+.folderChipActive .folderFilter svg {
+  color: var(--blue);
 }
 
 .folderName {
@@ -154,11 +202,12 @@
   font-size: 0.52rem;
 }
 
-.folderChip button {
+.folderRemove {
   display: grid;
   flex: none;
   width: 20px;
   height: 20px;
+  margin-right: 3px;
   padding: 0;
   color: var(--muted);
   font: inherit;
@@ -171,14 +220,22 @@
   place-items: center;
 }
 
-.folderChip button:hover:not(:disabled) {
+.folderRemove:hover:not(:disabled) {
   color: #fff;
   background: var(--danger);
 }
 
-.folderChip button:disabled {
+.folderRemove:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.folderFilter:focus-visible,
+.folderRemove:focus-visible,
+.allFoldersChip:focus-visible,
+.groupToggle:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 .libraryBar {
@@ -214,6 +271,26 @@
   white-space: nowrap;
 }
 
+.summaryTitleRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.clearFilter {
+  flex: none;
+  padding: 0;
+  color: var(--blue);
+  font: inherit;
+  font-size: 0.56rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .librarySummary > span:last-child {
   color: var(--muted);
   font-size: 0.58rem;
@@ -224,6 +301,41 @@
   flex: none;
   gap: 7px;
   align-items: center;
+}
+
+.groupToggle {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.groupToggle:hover {
+  color: var(--ink);
+}
+
+.groupToggle svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.groupToggleActive {
+  color: var(--blue);
+  background: rgb(33 72 255 / 8%);
+  border-color: rgb(33 72 255 / 26%);
 }
 
 .search,
@@ -357,6 +469,65 @@
 
 .listCard {
   contain-intrinsic-size: auto 235px;
+}
+
+.folderGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.folderGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.folderGroupHeader {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.folderGroupHeader svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--blue);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.folderGroupHeader h2 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folderGroupHeader > span:first-of-type {
+  flex: none;
+  color: var(--muted);
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.52rem;
+}
+
+.folderGroupLine {
+  flex: 1;
+  height: 1px;
+  min-width: 12px;
+  background: var(--line);
 }
 
 .gridCard:hover,
@@ -518,6 +689,14 @@
   line-height: 1.6;
 }
 
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 3px;
+}
+
 .emptyMark {
   display: grid;
   width: 54px;
@@ -667,6 +846,13 @@
   .viewButtonActive,
   .folderChip {
     background: rgb(255 255 255 / 5%);
+  }
+
+  .folderChipActive,
+  .allFoldersChipActive,
+  .groupToggleActive {
+    background: rgb(33 72 255 / 14%);
+    border-color: rgb(96 130 255 / 35%);
   }
 
   .viewToggle {

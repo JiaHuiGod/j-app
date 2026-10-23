@@ -1,4 +1,5 @@
 const VIEW_KEY = 'japp.local-view.v1';
+const GROUP_KEY = 'japp.local-group.v1';
 const PROGRESS_PREFIX = 'japp.local-progress.v1:';
 
 export type LocalVideoViewMode = 'grid' | 'list';
@@ -16,6 +17,22 @@ export function saveViewMode(view: LocalVideoViewMode): void {
     window.localStorage.setItem(VIEW_KEY, view);
   } catch {
     // Ignore storage failures; view preference is non-critical.
+  }
+}
+
+export function readGroupByFolder(): boolean {
+  try {
+    return window.localStorage.getItem(GROUP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveGroupByFolder(grouped: boolean): void {
+  try {
+    window.localStorage.setItem(GROUP_KEY, grouped ? '1' : '0');
+  } catch {
+    // Ignore storage failures; grouping is non-critical.
   }
 }
 
