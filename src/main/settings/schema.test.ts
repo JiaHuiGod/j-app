@@ -4,6 +4,7 @@ import {
   parseCreateSiteConnectionInput,
   parseProxySettings,
   parseThemePreference,
+  parseWindowState,
 } from './schema';
 
 const disabledProxy = {
@@ -75,6 +76,13 @@ describe('application settings migration', () => {
       localVideo: {
         directories: [],
       },
+      windowState: {
+        x: null,
+        y: null,
+        width: 1180,
+        height: 760,
+        maximized: false,
+      },
     });
   });
 
@@ -100,6 +108,7 @@ describe('application settings migration', () => {
     expect(settings.schemaVersion).toBe(3);
     expect(settings.connections.sites).toHaveLength(1);
     expect(settings.connections.sites[0]?.pinned).toBe(false);
+    expect(settings.windowState.width).toBe(1180);
     expect(settings.appearance.theme).toBe('system');
   });
 
@@ -144,6 +153,7 @@ describe('application settings migration', () => {
     });
 
     expect(settings.appearance.theme).toBe('dark');
+    expect(settings.windowState.width).toBe(1180);
   });
 
   it('migrates a legacy single local video directory', () => {
@@ -193,6 +203,38 @@ describe('theme preference validation', () => {
 
   it('rejects an unknown theme preference', () => {
     expect(() => parseThemePreference('sepia')).toThrow(/主题/);
+  });
+});
+
+describe('window state validation', () => {
+  it('accepts valid saved bounds', () => {
+    expect(
+      parseWindowState({
+        x: -1200,
+        y: 40,
+        width: 1200,
+        height: 800,
+        maximized: true,
+      }),
+    ).toEqual({
+      x: -1200,
+      y: 40,
+      width: 1200,
+      height: 800,
+      maximized: true,
+    });
+  });
+
+  it('rejects a window smaller than the minimum size', () => {
+    expect(() =>
+      parseWindowState({
+        x: null,
+        y: null,
+        width: 400,
+        height: 300,
+        maximized: false,
+      }),
+    ).toThrow(/900|too small/i);
   });
 });
 

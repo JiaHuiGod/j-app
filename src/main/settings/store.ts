@@ -12,9 +12,17 @@ import path from 'node:path';
 import { app } from 'electron';
 import type { ThemePreference } from '@shared/appearance';
 import type { SiteConnection } from '@shared/connections';
-import type { AppSettings, ProxySettings } from '@shared/settings';
+import type {
+  AppSettings,
+  ProxySettings,
+  WindowStateSettings,
+} from '@shared/settings';
 import { createDefaultAppSettings } from './defaults';
-import { parseAppSettings, parseProxySettings } from './schema';
+import {
+  parseAppSettings,
+  parseProxySettings,
+  parseWindowState,
+} from './schema';
 
 const SETTINGS_FILE_NAME = 'settings.json';
 
@@ -156,6 +164,23 @@ async function updateSettings(
 
 export async function getProxySettings(): Promise<ProxySettings> {
   return (await loadSettings()).network.proxy;
+}
+
+export async function getWindowState(): Promise<WindowStateSettings> {
+  return (await loadSettings()).windowState;
+}
+
+export async function saveWindowState(
+  input: unknown,
+): Promise<WindowStateSettings> {
+  const windowState = parseWindowState(input);
+
+  await updateSettings((current) => ({
+    ...current,
+    windowState,
+  }));
+
+  return windowState;
 }
 
 export async function saveProxySettings(

@@ -17,4 +17,14 @@ describe('default app settings', () => {
   it('does not load a local video library until a directory is configured', () => {
     expect(createDefaultAppSettings().localVideo.directories).toEqual([]);
   });
+
+  it('uses a centered default window size', () => {
+    expect(createDefaultAppSettings().windowState).toEqual({
+      x: null,
+      y: null,
+      width: 1180,
+      height: 760,
+      maximized: false,
+    });
+  });
 });

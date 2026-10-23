@@ -12,6 +12,25 @@ export interface ProxySettings {
   readonly port: number;
 }
 
+export const DEFAULT_WINDOW_WIDTH = 1180;
+export const DEFAULT_WINDOW_HEIGHT = 760;
+
+export interface WindowStateSettings {
+  readonly x: number | null;
+  readonly y: number | null;
+  readonly width: number;
+  readonly height: number;
+  readonly maximized: boolean;
+}
+
+export const DEFAULT_WINDOW_STATE: WindowStateSettings = {
+  x: null,
+  y: null,
+  width: DEFAULT_WINDOW_WIDTH,
+  height: DEFAULT_WINDOW_HEIGHT,
+  maximized: false,
+};
+
 export interface AppSettings {
   readonly schemaVersion: 3;
   readonly network: {
@@ -32,6 +51,7 @@ export interface AppSettings {
   readonly localVideo: {
     readonly directories: readonly string[];
   };
+  readonly windowState: WindowStateSettings;
 }
 
 export type ProxyTestTargetId = 'google' | 'github';

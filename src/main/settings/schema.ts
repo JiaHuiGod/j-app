@@ -5,9 +5,11 @@ import type {
   SiteConnection,
 } from '@shared/connections';
 import {
+  DEFAULT_WINDOW_STATE,
   PROXY_PROTOCOLS,
   type AppSettings,
   type ProxySettings,
+  type WindowStateSettings,
 } from '@shared/settings';
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -165,6 +167,16 @@ const localVideoSchema = z
   )
   .default({ directories: [] });
 
+const windowStateSchema = z
+  .object({
+    x: z.number().int().min(-100_000).max(100_000).nullable(),
+    y: z.number().int().min(-100_000).max(100_000).nullable(),
+    width: z.number().int().min(900).max(10_000),
+    height: z.number().int().min(620).max(10_000),
+    maximized: z.boolean(),
+  })
+  .default(DEFAULT_WINDOW_STATE);
+
 const appSettingsSchema = z.object({
   schemaVersion: z.literal(3),
   network: z.object({
@@ -175,6 +187,7 @@ const appSettingsSchema = z.object({
   downloads: downloadsSchema,
   subtitles: subtitlesSchema,
   localVideo: localVideoSchema,
+  windowState: windowStateSchema,
 });
 
 const createSiteConnectionInputSchema = z.object({
@@ -192,6 +205,16 @@ function formatSchemaError(error: z.ZodError): string {
 
 export function parseProxySettings(input: unknown): ProxySettings {
   const result = proxySettingsSchema.safeParse(input);
+
+  if (!result.success) {
+    throw new Error(formatSchemaError(result.error));
+  }
+
+  return result.data;
+}
+
+export function parseWindowState(input: unknown): WindowStateSettings {
+  const result = windowStateSchema.safeParse(input);
 
   if (!result.success) {
     throw new Error(formatSchemaError(result.error));
@@ -231,6 +254,7 @@ export function parseAppSettings(input: unknown): AppSettings {
       localVideo: {
         directories: [],
       },
+      windowState: DEFAULT_WINDOW_STATE,
     };
   }
 
@@ -262,6 +286,7 @@ export function parseAppSettings(input: unknown): AppSettings {
       localVideo: {
         directories: [],
       },
+      windowState: DEFAULT_WINDOW_STATE,
     };
   }
 

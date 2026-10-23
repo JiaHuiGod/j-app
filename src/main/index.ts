@@ -48,11 +48,11 @@ if (started) {
 
       registerIpcHandlers();
       registerLocalVideoProtocol();
-      createMainWindow();
+      await createMainWindow();
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-          createMainWindow();
+          void createMainWindow();
         }
       });
     })

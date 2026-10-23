@@ -1,4 +1,5 @@
 import type { AppSettings, ProxySettings } from '@shared/settings';
+import { DEFAULT_WINDOW_STATE } from '@shared/settings';
 
 export const DEFAULT_PROXY_SETTINGS: ProxySettings = {
   enabled: false,
@@ -27,6 +28,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   localVideo: {
     directories: [],
   },
+  windowState: DEFAULT_WINDOW_STATE,
 };
 
 export function createDefaultAppSettings(): AppSettings {

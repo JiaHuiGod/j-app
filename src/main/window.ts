@@ -1,7 +1,17 @@
 import path from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, screen, shell } from 'electron';
 import { IpcChannel } from '@shared/ipc';
+import type { WindowStateSettings } from '@shared/settings';
+import { DEFAULT_WINDOW_STATE } from '@shared/settings';
 import { getWindowBackgroundColor } from './appearance/theme';
+import { getWindowState, saveWindowState } from './settings/store';
+import {
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  resolveWindowBounds,
+  type WindowBounds,
+  type WindowDisplay,
+} from './window-state';
 
 const WINDOW_ICON = app.isPackaged
   ? path.join(process.resourcesPath, 'icon.png')
@@ -13,8 +23,11 @@ const WINDOW_CHROME =
         trafficLightPosition: { x: 16, y: 18 },
       }
     : { frame: false };
+const WINDOW_STATE_DEBOUNCE_MS = 350;
+const FALLBACK_WINDOW_STATE: WindowStateSettings = DEFAULT_WINDOW_STATE;
 
 let mainWindow: BrowserWindow | null = null;
+let pendingMainWindow: Promise<BrowserWindow> | null = null;
 
 function openExternalLink(rawUrl: string): void {
   try {
@@ -99,6 +112,118 @@ function bindWindowState(browserWindow: BrowserWindow): void {
   browserWindow.on('unmaximize', publishMaximizedState);
 }
 
+/**
+ * Chromium's Windows frame/shadow compensation can make a newly constructed
+ * window slightly larger than the requested bounds, and applying setBounds can
+ * still leave a small residual. Correct against the actual bounds so a saved
+ * size is stable across restarts instead of growing each launch.
+ */
+function setExactWindowBounds(
+  browserWindow: BrowserWindow,
+  target: WindowBounds,
+): void {
+  browserWindow.setBounds(target);
+  let actual = browserWindow.getBounds();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const widthDelta = actual.width - target.width;
+    const heightDelta = actual.height - target.height;
+
+    if (widthDelta === 0 && heightDelta === 0) {
+      return;
+    }
+
+    browserWindow.setBounds({
+      x: target.x,
+      y: target.y,
+      width: target.width - widthDelta,
+      height: target.height - heightDelta,
+    });
+    actual = browserWindow.getBounds();
+  }
+}
+
+function bindWindowPersistence(browserWindow: BrowserWindow): void {
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let isClosing = false;
+
+  const clearSaveTimer = () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+  };
+
+  const persist = async (): Promise<void> => {
+    if (
+      browserWindow.isDestroyed() ||
+      browserWindow.isMinimized() ||
+      browserWindow.isFullScreen()
+    ) {
+      return;
+    }
+
+    const bounds = browserWindow.getNormalBounds();
+
+    try {
+      await saveWindowState({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        maximized: browserWindow.isMaximized(),
+      });
+    } catch (error) {
+      console.error('Failed to save window state:', error);
+    }
+  };
+
+  const scheduleSave = () => {
+    clearSaveTimer();
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      void persist();
+    }, WINDOW_STATE_DEBOUNCE_MS);
+  };
+
+  browserWindow.on('move', scheduleSave);
+  browserWindow.on('resize', scheduleSave);
+  browserWindow.on('maximize', scheduleSave);
+  browserWindow.on('unmaximize', scheduleSave);
+  browserWindow.on('close', (event) => {
+    if (isClosing) {
+      return;
+    }
+
+    event.preventDefault();
+    isClosing = true;
+    clearSaveTimer();
+
+    // Persist before shutting down so a resize immediately followed by close
+    // is not lost while the async settings write is still pending.
+    void persist().finally(() => {
+      if (!browserWindow.isDestroyed()) {
+        browserWindow.close();
+      }
+    });
+  });
+  browserWindow.on('closed', clearSaveTimer);
+}
+
+function getDisplaySnapshot(): {
+  displays: readonly WindowDisplay[];
+  primary: WindowDisplay;
+} {
+  return {
+    displays: screen.getAllDisplays().map((display) => ({
+      workArea: display.workArea,
+    })),
+    primary: {
+      workArea: screen.getPrimaryDisplay().workArea,
+    },
+  };
+}
+
 async function loadRenderer(browserWindow: BrowserWindow): Promise<void> {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     await browserWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -110,17 +235,15 @@ async function loadRenderer(browserWindow: BrowserWindow): Promise<void> {
   );
 }
 
-export function createMainWindow(): BrowserWindow {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    focusMainWindow();
-    return mainWindow;
-  }
-
+async function buildMainWindow(): Promise<BrowserWindow> {
+  const storedState = await getWindowState().catch(() => null);
+  const state = storedState ?? FALLBACK_WINDOW_STATE;
+  const { displays, primary } = getDisplaySnapshot();
+  const bounds = resolveWindowBounds(state, displays, primary);
   const browserWindow = new BrowserWindow({
-    width: 1180,
-    height: 760,
-    minWidth: 900,
-    minHeight: 620,
+    ...bounds,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: getWindowBackgroundColor(),
@@ -139,9 +262,35 @@ export function createMainWindow(): BrowserWindow {
   mainWindow = browserWindow;
   secureWebContents(browserWindow);
   bindWindowState(browserWindow);
+  bindWindowPersistence(browserWindow);
+  setExactWindowBounds(browserWindow, bounds);
+
+  if (state.maximized) {
+    browserWindow.maximize();
+  }
 
   browserWindow.once('ready-to-show', () => {
     browserWindow.show();
+
+    // Hidden windows can report a different frame compensation than visible
+    // ones. Re-apply the target after showing so the first persisted state is
+    // already the final size instead of one pixel off.
+    if (!state.maximized) {
+      setExactWindowBounds(browserWindow, bounds);
+
+      // The first show can trigger one more native frame adjustment after the
+      // current task. Re-check shortly after showing so the initial settings
+      // readout and the first persisted state match the requested size.
+      setTimeout(() => {
+        if (
+          !browserWindow.isDestroyed() &&
+          !browserWindow.isMaximized() &&
+          !browserWindow.isFullScreen()
+        ) {
+          setExactWindowBounds(browserWindow, bounds);
+        }
+      }, 50);
+    }
 
     if (!app.isPackaged) {
       // Detached DevTools keeps the custom window chrome at its real size.
@@ -160,6 +309,21 @@ export function createMainWindow(): BrowserWindow {
   });
 
   return browserWindow;
+}
+
+export function createMainWindow(): Promise<BrowserWindow> {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    focusMainWindow();
+    return Promise.resolve(mainWindow);
+  }
+
+  if (!pendingMainWindow) {
+    pendingMainWindow = buildMainWindow().finally(() => {
+      pendingMainWindow = null;
+    });
+  }
+
+  return pendingMainWindow;
 }
 
 export function focusMainWindow(): void {

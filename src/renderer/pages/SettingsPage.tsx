@@ -286,6 +286,7 @@ export function SettingsPage({ appearance }: SettingsPageProps) {
           void appearance.setPreference(theme);
         }}
       />
+
       <DownloadSettings />
 
       <section aria-labelledby="connections-title" className={styles.card}>

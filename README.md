@@ -132,7 +132,8 @@ j-app/
 │  │  ├─ index.ts               # 应用生命周期、单实例、启动流程
 │  │  ├─ ipc.ts                 # ipcMain 处理器
 │  │  ├─ security.ts            # CSP 与 webview 防护
-│  │  └─ window.ts              # BrowserWindow、导航与外链策略
+│  │  ├─ window-state.ts        # 窗口尺寸校验、多显示器回退
+│  │  └─ window.ts              # BrowserWindow、导航、外链与窗口状态持久化
 │  ├─ preload/                  # 预加载：受控 API 边界
 │  │  └─ index.ts               # contextBridge 暴露 window.desktop
 │  ├─ renderer/                 # 渲染进程：只负责 UI
@@ -285,6 +286,14 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 - 中间留白同时作为拖拽窗口的区域。
 
 窗口控制通过 `window.desktop.windowControls` 暴露，渲染层拿不到原始 `ipcRenderer`。主进程根据 IPC 发送者定位窗口，并在最大化状态变化时广播事件，按钮图标会随之切换。开发模式启动时会自动在独立窗口打开 DevTools，也可以使用 `F12` 或 `Ctrl/Cmd + Shift + I` 手动切换；生产构建不会自动打开。
+
+窗口尺寸、位置和最大化状态保存在 `settings.json` 的 `windowState`：
+
+- 拖动或缩放后防抖保存，关闭窗口前等待最后一次写入完成；
+- 启动后会校正 Windows 隐形边框/阴影带来的 bounds 偏差，避免每次重启尺寸累加；
+- 下次启动时校验保存位置是否仍在当前显示器工作区内，显示器移除或分辨率变化时回退到主屏居中；
+- 设置页不提供窗口尺寸修改或重置入口，窗口状态完全由用户实际调整自动维护；
+- 纯边界计算位于 [`src/main/window-state.ts`](src/main/window-state.ts)，窗口生命周期和 IPC 位于 [`src/main/window.ts`](src/main/window.ts)。
 
 ## 主导航与页面
 
