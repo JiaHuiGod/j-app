@@ -23,6 +23,15 @@ import {
 
 app.setName('J App');
 
+// Squirrel builds the shortcut AUMID as
+// com.squirrel.<nupkg-id>.<exe-name-without-spaces>.
+// The window must use the same AUMID so Windows groups it with the shortcut.
+const WINDOWS_APP_USER_MODEL_ID = 'com.squirrel.j_app.JApp';
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
+}
+
 if (started) {
   // Squirrel uses this process to create or remove Windows shortcuts.
   app.quit();
@@ -47,10 +56,6 @@ if (started) {
   void app
     .whenReady()
     .then(async () => {
-      if (process.platform === 'win32') {
-        app.setAppUserModelId('com.japp.desktop');
-      }
-
       installSecurityPolicies();
 
       const settings = await loadSettings();
