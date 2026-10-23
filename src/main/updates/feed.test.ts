@@ -3,9 +3,9 @@ import { buildUpdateFeedUrl, isAutoUpdateSupported } from './feed';
 
 describe('auto update feed', () => {
   it('builds the update.electronjs.org feed for a Windows release', () => {
-    expect(
-      buildUpdateFeedUrl('Nantoforget/j-app', '0.2.0', 'win32', 'x64'),
-    ).toBe('https://update.electronjs.org/Nantoforget/j-app/win32-x64/0.2.0');
+    expect(buildUpdateFeedUrl('JiaHuiGod/j-app', '0.2.0', 'win32', 'x64')).toBe(
+      'https://update.electronjs.org/JiaHuiGod/j-app/win32-x64/0.2.0',
+    );
   });
 
   it('only enables updates for the packaged Windows x64 build', () => {

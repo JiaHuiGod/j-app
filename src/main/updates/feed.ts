@@ -1,4 +1,4 @@
-export const UPDATE_REPOSITORY = 'Nantoforget/j-app';
+export const UPDATE_REPOSITORY = 'JiaHuiGod/j-app';
 
 export function buildUpdateFeedUrl(
   repository: string,

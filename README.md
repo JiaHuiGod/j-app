@@ -333,10 +333,10 @@ Forge 打包时使用 `resources/icon`：Windows 自动选择 ICO、macOS 选择
 
 项目通过 GitHub 公开仓库和 [update.electronjs.org](https://update.electronjs.org) 分发 Windows x64 更新：
 
-- 仓库：`Nantoforget/j-app`
+- 仓库：`JiaHuiGod/j-app`
 - Release 资产：`RELEASES`、完整 nupkg、可选 delta nupkg、Setup.exe
 - 客户端：Electron 内置 `autoUpdater`
-- 更新源：`https://update.electronjs.org/Nantoforget/j-app/win32-x64/<version>`
+- 更新源：`https://update.electronjs.org/JiaHuiGod/j-app/win32-x64/<version>`
 - 更新实现：[`src/main/updates/manager.ts`](src/main/updates/manager.ts)
 - 地址与平台判断：[`src/main/updates/feed.ts`](src/main/updates/feed.ts)
 
